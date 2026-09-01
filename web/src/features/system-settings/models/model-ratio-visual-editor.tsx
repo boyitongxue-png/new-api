@@ -24,7 +24,7 @@ import type {
   VisibilityState,
   SortingState,
 } from '@tanstack/react-table'
-import { Copy, Plus } from 'lucide-react'
+import { Copy, Plus, Trash2 } from 'lucide-react'
 import {
   useState,
   useMemo,
@@ -47,7 +47,7 @@ import {
   useDataTable,
 } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
-import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
+import { Dialog } from '@/components/dialog'
 import { combineBillingExpr } from '@/features/pricing/lib/billing-expr'
 import { useMediaQuery } from '@/hooks'
 
@@ -65,10 +65,7 @@ import {
   isBasePricingUnset,
   type ModelRow,
 } from './model-pricing-snapshots'
-import {
-  buildModelRatioColumns,
-  TASK_PRICING_MODE_FILTER,
-} from './model-ratio-table-columns'
+import { buildModelRatioColumns } from './model-ratio-table-columns'
 
 type ModelRatioVisualEditorProps = {
   savedModelPrice: string
@@ -140,10 +137,10 @@ const ModelRatioVisualEditorComponent = forwardRef<
   ref
 ) {
   const { t } = useTranslation()
-  const { models: pricingModels } = usePricingData()
   const isMobile = useMediaQuery('(max-width: 767px)')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false)
   const [editData, setEditData] = useState<ModelRatioData | null>(null)
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -192,20 +189,6 @@ const ModelRatioVisualEditorComponent = forwardRef<
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility))
   }, [columnVisibility])
-
-  const taskModelNames = useMemo(
-    () =>
-      new Set(
-        pricingModels
-          .filter(
-            (model) =>
-              model.billing_usage_schema &&
-              Object.keys(model.billing_usage_schema).length > 0
-          )
-          .map((model) => model.model_name)
-      ),
-    [pricingModels]
-  )
 
   const models = useMemo(() => {
     const savedRows = buildModelSnapshots({
@@ -286,30 +269,26 @@ const ModelRatioVisualEditorComponent = forwardRef<
     billingExpr,
   ])
 
-  const modeCounts = useMemo(() => {
-    const counts = {
-      'per-token': 0,
-      'per-request': 0,
-      tiered_expr: 0,
-      [TASK_PRICING_MODE_FILTER]: 0,
-    }
-    for (const model of models) {
-      const mode =
-        model.billingMode === 'per-request' ||
-        model.billingMode === 'tiered_expr'
-          ? model.billingMode
-          : 'per-token'
-      counts[mode] += 1
-      if (
-        taskModelNames.has(model.name) &&
-        model.billingMode === 'tiered_expr' &&
-        Boolean(model.billingExpr)
-      ) {
-        counts[TASK_PRICING_MODE_FILTER] += 1
-      }
-    }
-    return counts
-  }, [models, taskModelNames])
+  const modeCounts = useMemo(
+    () =>
+      models.reduce(
+        (acc, model) => {
+          const mode =
+            model.billingMode === 'per-request' ||
+            model.billingMode === 'tiered_expr'
+              ? model.billingMode
+              : 'per-token'
+          acc[mode] += 1
+          return acc
+        },
+        {
+          'per-token': 0,
+          'per-request': 0,
+          tiered_expr: 0,
+        } as Record<'per-token' | 'per-request' | 'tiered_expr', number>
+      ),
+    [models]
+  )
 
   const handleEdit = useCallback(
     (model: ModelRow) => {
@@ -457,16 +436,45 @@ const ModelRatioVisualEditorComponent = forwardRef<
     ]
   )
 
+  const handleBatchDelete = useCallback(() => {
+    const names = table
+      .getFilteredSelectedRowModel()
+      .rows.map((row) => row.original.name)
+    if (names.length === 0) return
+
+    const maps = {
+      ModelPrice: safeJsonParse<Record<string, number>>(modelPrice, { fallback: {}, silent: true }),
+      ModelRatio: safeJsonParse<Record<string, number>>(modelRatio, { fallback: {}, silent: true }),
+      CacheRatio: safeJsonParse<Record<string, number>>(cacheRatio, { fallback: {}, silent: true }),
+      CreateCacheRatio: safeJsonParse<Record<string, number>>(createCacheRatio, { fallback: {}, silent: true }),
+      CompletionRatio: safeJsonParse<Record<string, number>>(completionRatio, { fallback: {}, silent: true }),
+      ImageRatio: safeJsonParse<Record<string, number>>(imageRatio, { fallback: {}, silent: true }),
+      AudioRatio: safeJsonParse<Record<string, number>>(audioRatio, { fallback: {}, silent: true }),
+      AudioCompletionRatio: safeJsonParse<Record<string, number>>(audioCompletionRatio, { fallback: {}, silent: true }),
+      'billing_setting.billing_mode': safeJsonParse<Record<string, string>>(billingMode, { fallback: {}, silent: true }),
+      'billing_setting.billing_expr': safeJsonParse<Record<string, string>>(billingExpr, { fallback: {}, silent: true }),
+    }
+    names.forEach((name) => Object.values(maps).forEach((map) => delete map[name]))
+    Object.entries(maps).forEach(([field, map]) => onChange(field, JSON.stringify(map, null, 2)))
+    if (editData?.name && names.includes(editData.name)) {
+      setEditData(null)
+      setEditorOpen(false)
+      setSheetOpen(false)
+    }
+    table.resetRowSelection()
+    setShowBatchDeleteConfirm(false)
+    toast.success(t('Successfully deleted {{count}} model(s)', { count: names.length }))
+  }, [audioCompletionRatio, audioRatio, billingExpr, billingMode, cacheRatio, completionRatio, createCacheRatio, editData, imageRatio, modelPrice, modelRatio, onChange, table, t])
+
   const columns = useMemo(
     () =>
       buildModelRatioColumns({
         onDelete: handleDelete,
         onEdit: handleEdit,
         deleteDisabled: filterMode === 'unset',
-        taskModelNames,
         t,
       }),
-    [handleEdit, handleDelete, filterMode, t, taskModelNames]
+    [handleEdit, handleDelete, filterMode, t]
   )
 
   const ensurePageInRange = useCallback((pageCount: number) => {
@@ -727,11 +735,6 @@ const ModelRatioVisualEditorComponent = forwardRef<
                     value: 'tiered_expr',
                     count: modeCounts.tiered_expr,
                   },
-                  {
-                    label: 'Expression - Task pricing',
-                    value: TASK_PRICING_MODE_FILTER,
-                    count: modeCounts[TASK_PRICING_MODE_FILTER],
-                  },
                 ],
               },
             ]}
@@ -833,6 +836,15 @@ const ModelRatioVisualEditorComponent = forwardRef<
       </div>
 
       <DataTableBulkActions table={table} entityName={t('model')}>
+        <Button
+          size='sm'
+          variant='destructive'
+          onClick={() => setShowBatchDeleteConfirm(true)}
+          disabled={filterMode === 'unset'}
+        >
+          <Trash2 data-icon='inline-start' />
+          {t('Delete selected')}
+        </Button>
         <Button size='sm' disabled={!editData} onClick={handleBatchCopy}>
           <Copy data-icon='inline-start' />
           {editData
@@ -840,6 +852,28 @@ const ModelRatioVisualEditorComponent = forwardRef<
             : t('Open a source model first')}
         </Button>
       </DataTableBulkActions>
+
+      <Dialog
+        open={showBatchDeleteConfirm}
+        onOpenChange={setShowBatchDeleteConfirm}
+        title={t('Delete Models?')}
+        description={t('Are you sure you want to delete {{count}} model(s)? This action cannot be undone.', {
+          count: table.getFilteredSelectedRowModel().rows.length,
+        })}
+        contentHeight='auto'
+        footer={
+          <>
+            <Button variant='outline' onClick={() => setShowBatchDeleteConfirm(false)}>
+              {t('Cancel')}
+            </Button>
+            <Button variant='destructive' onClick={handleBatchDelete}>
+              {t('Delete')}
+            </Button>
+          </>
+        }
+      >
+        {' '}
+      </Dialog>
 
       {isMobile && (
         <ModelPricingSheet
