@@ -464,7 +464,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     table.resetRowSelection()
     setShowBatchDeleteConfirm(false)
     toast.success(t('Successfully deleted {{count}} model(s)', { count: names.length }))
-  }, [audioCompletionRatio, audioRatio, billingExpr, billingMode, cacheRatio, completionRatio, createCacheRatio, editData, imageRatio, modelPrice, modelRatio, onChange, table, t])
+  }, [audioCompletionRatio, audioRatio, billingExpr, billingMode, cacheRatio, completionRatio, createCacheRatio, editData, imageRatio, modelPrice, modelRatio, onChange, t])
 
   const columns = useMemo(
     () =>
