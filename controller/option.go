@@ -125,6 +125,96 @@ type OptionUpdateRequest struct {
 	Value any    `json:"value"`
 }
 
+type BulkOptionUpdateRequest struct {
+	Options map[string]string `json:"options"`
+}
+
+var modelPricingOptionKeys = map[string]struct{}{
+	"ModelPrice":                   {},
+	"ModelRatio":                   {},
+	"CacheRatio":                   {},
+	"CreateCacheRatio":             {},
+	"CompletionRatio":              {},
+	"ImageRatio":                   {},
+	"AudioRatio":                   {},
+	"AudioCompletionRatio":         {},
+	"ExposeRatioEnabled":           {},
+	"billing_setting.billing_mode": {},
+	"billing_setting.billing_expr": {},
+}
+
+func validateModelPricingOption(key, value string) error {
+	if key == "ExposeRatioEnabled" {
+		if value != "true" && value != "false" {
+			return fmt.Errorf("ExposeRatioEnabled must be true or false")
+		}
+		return nil
+	}
+	var parsed map[string]any
+	if err := common.UnmarshalJsonStr(value, &parsed); err != nil {
+		return fmt.Errorf("%s must be a JSON object: %w", key, err)
+	}
+	if key != "billing_setting.billing_expr" {
+		return nil
+	}
+
+	expressions := make(map[string]string, len(parsed))
+	for modelName, raw := range parsed {
+		expression, ok := raw.(string)
+		if !ok {
+			return fmt.Errorf("billing expression for model %s must be a string", modelName)
+		}
+		expressions[modelName] = expression
+	}
+	generation := jsplugin.DefaultRegistry.Generation()
+	for modelName, expression := range expressions {
+		var err error
+		if plugin, ok := generation.GetByModel(modelName); ok {
+			err = billing_setting.SmokeTestTaskExpr(expression, plugin.Meta.UsageSchema)
+		} else if target, resolved := model.ResolveTaskModelAlias(generation, modelName); resolved {
+			if plugin, ok := generation.Get(target.PluginKey); ok {
+				err = billing_setting.SmokeTestTaskExpr(expression, plugin.Meta.UsageSchema)
+			} else {
+				err = billing_setting.SmokeTestExpr(expression)
+			}
+		} else {
+			err = billing_setting.SmokeTestExpr(expression)
+		}
+		if err != nil {
+			return fmt.Errorf("model %s has invalid billing expression: %w", modelName, err)
+		}
+	}
+	return nil
+}
+
+func UpdateModelPricingOptions(c *gin.Context) {
+	var request BulkOptionUpdateRequest
+	if err := common.DecodeJson(c.Request.Body, &request); err != nil || len(request.Options) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "无效的模型配置参数"})
+		return
+	}
+	for key, value := range request.Options {
+		if _, ok := modelPricingOptionKeys[key]; !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "不允许批量修改该配置项: " + key})
+			return
+		}
+		if err := validateModelPricingOption(key, value); err != nil {
+			common.ApiErrorMsg(c, err.Error())
+			return
+		}
+	}
+	if err := model.UpdateOptionsBulk(request.Options); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	keys := make([]string, 0, len(request.Options))
+	for key := range request.Options {
+		keys = append(keys, key)
+	}
+	recordManageAudit(c, "option.bulk_update", map[string]interface{}{"keys": keys})
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
+}
+
 func UpdateOption(c *gin.Context) {
 	var option OptionUpdateRequest
 	err := common.DecodeJson(c.Request.Body, &option)

@@ -27,7 +27,7 @@ import * as z from 'zod'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-import { resetModelRatios } from '../api'
+import { resetModelRatios, updateModelPricingOptions } from '../api'
 import { SettingsPageTitleStatusPortal } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
@@ -345,21 +345,23 @@ export function RatioSettingsCard({
         return
       }
 
-      for (const key of updates) {
-        const apiKey = apiKeyMap[key as string] || (key as string)
-        const result = await updateOption.mutateAsync({
-          key: apiKey,
-          value: normalized[key],
-        })
-        if (!result.success) {
-          throw new Error(result.message || t('Failed to update setting'))
-        }
+      const options = Object.fromEntries(
+        updates.map((key) => [
+          apiKeyMap[key as string] || (key as string),
+          String(normalized[key]),
+        ])
+      )
+      const result = await updateModelPricingOptions(options)
+      if (!result.success) {
+        throw new Error(result.message || t('Failed to update setting'))
       }
+
+      await queryClient.invalidateQueries({ queryKey: ['system-options'] })
 
       modelNormalizedDefaults.current = normalized
       setSavedModelValues(normalized)
     },
-    [t, updateOption]
+    [queryClient, t]
   )
 
   const saveGroupRatios = useCallback(
