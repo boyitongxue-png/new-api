@@ -42,6 +42,7 @@ import {
   SettingsSwitchContent,
   SettingsSwitchItem,
 } from '../components/settings-form-layout'
+import type { ModelRatioPricingValues } from './model-ratio-pricing-values'
 import {
   ModelRatioVisualEditor,
   type ModelRatioVisualEditorHandle,
@@ -219,6 +220,20 @@ export const ModelRatioForm = memo(function ModelRatioForm({
     await form.handleSubmit(onSave)()
   }, [editMode, form, onSave])
 
+  const handlePersistPricingValues = useCallback(
+    async (values: ModelRatioPricingValues) => {
+      await onSave({ ...form.getValues(), ...values })
+
+      Object.entries(values).forEach(([field, value]) => {
+        form.setValue(field as keyof ModelFormValues, value, {
+          shouldValidate: true,
+          shouldDirty: false,
+        })
+      })
+    },
+    [form, onSave]
+  )
+
   return (
     <div className='space-y-6'>
       {!isUnsetVariant && (
@@ -293,6 +308,7 @@ export const ModelRatioForm = memo(function ModelRatioForm({
               }
               filterMode={isUnsetVariant ? 'unset' : 'all'}
               onSave={handleSave}
+              onPersist={handlePersistPricingValues}
               isSaving={isSaving}
               onChange={(field, value) => {
                 const fieldMap: Record<string, keyof ModelFormValues> = {

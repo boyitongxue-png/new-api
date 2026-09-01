@@ -347,7 +347,13 @@ export function RatioSettingsCard({
 
       for (const key of updates) {
         const apiKey = apiKeyMap[key as string] || (key as string)
-        await updateOption.mutateAsync({ key: apiKey, value: normalized[key] })
+        const result = await updateOption.mutateAsync({
+          key: apiKey,
+          value: normalized[key],
+        })
+        if (!result.success) {
+          throw new Error(result.message || t('Failed to update setting'))
+        }
       }
 
       modelNormalizedDefaults.current = normalized

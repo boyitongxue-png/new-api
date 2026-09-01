@@ -46,8 +46,8 @@ import {
   DataTableView,
   useDataTable,
 } from '@/components/data-table'
-import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/dialog'
+import { Button } from '@/components/ui/button'
 import { combineBillingExpr } from '@/features/pricing/lib/billing-expr'
 import { useMediaQuery } from '@/hooks'
 
@@ -65,6 +65,10 @@ import {
   isBasePricingUnset,
   type ModelRow,
 } from './model-pricing-snapshots'
+import {
+  removeModelsFromPricingValues,
+  type ModelRatioPricingValues,
+} from './model-ratio-pricing-values'
 import { buildModelRatioColumns } from './model-ratio-table-columns'
 
 type ModelRatioVisualEditorProps = {
@@ -93,6 +97,7 @@ type ModelRatioVisualEditorProps = {
   filterMode?: 'all' | 'unset'
   onChange: (field: string, value: string) => void
   onSave: () => void | Promise<void>
+  onPersist: (values: ModelRatioPricingValues) => Promise<void>
   isSaving: boolean
 }
 
@@ -132,6 +137,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     filterMode = 'all',
     onChange,
     onSave,
+    onPersist,
     isSaving,
   },
   ref
@@ -340,86 +346,23 @@ const ModelRatioVisualEditorComponent = forwardRef<
     []
   )
 
-  const handleDelete = useCallback(
-    (name: string) => {
-      const priceMap = safeJsonParse<Record<string, number>>(modelPrice, {
-        fallback: {},
-        silent: true,
-      })
-      const ratioMap = safeJsonParse<Record<string, number>>(modelRatio, {
-        fallback: {},
-        silent: true,
-      })
-      const cacheMap = safeJsonParse<Record<string, number>>(cacheRatio, {
-        fallback: {},
-        silent: true,
-      })
-      const createCacheMap = safeJsonParse<Record<string, number>>(
-        createCacheRatio,
-        { fallback: {}, silent: true }
-      )
-      const completionMap = safeJsonParse<Record<string, number>>(
-        completionRatio,
-        { fallback: {}, silent: true }
-      )
-      const imageMap = safeJsonParse<Record<string, number>>(imageRatio, {
-        fallback: {},
-        silent: true,
-      })
-      const audioMap = safeJsonParse<Record<string, number>>(audioRatio, {
-        fallback: {},
-        silent: true,
-      })
-      const audioCompletionMap = safeJsonParse<Record<string, number>>(
-        audioCompletionRatio,
-        { fallback: {}, silent: true }
-      )
-      const billingModeMap = safeJsonParse<Record<string, string>>(
-        billingMode,
-        { fallback: {}, silent: true }
-      )
-      const billingExprMap = safeJsonParse<Record<string, string>>(
-        billingExpr,
-        { fallback: {}, silent: true }
-      )
-
-      delete priceMap[name]
-      delete ratioMap[name]
-      delete cacheMap[name]
-      delete createCacheMap[name]
-      delete completionMap[name]
-      delete imageMap[name]
-      delete audioMap[name]
-      delete audioCompletionMap[name]
-      delete billingModeMap[name]
-      delete billingExprMap[name]
-
-      onChange('ModelPrice', JSON.stringify(priceMap, null, 2))
-      onChange('ModelRatio', JSON.stringify(ratioMap, null, 2))
-      onChange('CacheRatio', JSON.stringify(cacheMap, null, 2))
-      onChange('CreateCacheRatio', JSON.stringify(createCacheMap, null, 2))
-      onChange('CompletionRatio', JSON.stringify(completionMap, null, 2))
-      onChange('ImageRatio', JSON.stringify(imageMap, null, 2))
-      onChange('AudioRatio', JSON.stringify(audioMap, null, 2))
-      onChange(
-        'AudioCompletionRatio',
-        JSON.stringify(audioCompletionMap, null, 2)
-      )
-      onChange(
-        'billing_setting.billing_mode',
-        JSON.stringify(billingModeMap, null, 2)
-      )
-      onChange(
-        'billing_setting.billing_expr',
-        JSON.stringify(billingExprMap, null, 2)
-      )
-
-      if (editData?.name === name) {
-        setEditData(null)
-        setEditorOpen(false)
-        setSheetOpen(false)
-      }
-    },
+  const getDeletedPricingValues = useCallback(
+    (names: string[]) =>
+      removeModelsFromPricingValues(
+        {
+          ModelPrice: modelPrice,
+          ModelRatio: modelRatio,
+          CacheRatio: cacheRatio,
+          CreateCacheRatio: createCacheRatio,
+          CompletionRatio: completionRatio,
+          ImageRatio: imageRatio,
+          AudioRatio: audioRatio,
+          AudioCompletionRatio: audioCompletionRatio,
+          BillingMode: billingMode,
+          BillingExpr: billingExpr,
+        },
+        names
+      ),
     [
       modelPrice,
       modelRatio,
@@ -431,50 +374,65 @@ const ModelRatioVisualEditorComponent = forwardRef<
       audioCompletionRatio,
       billingMode,
       billingExpr,
-      onChange,
-      editData,
     ]
   )
 
-  const handleBatchDelete = useCallback(() => {
-    const names = table
-      .getFilteredSelectedRowModel()
-      .rows.map((row) => row.original.name)
-    if (names.length === 0) return
+  const applyPricingValues = useCallback(
+    (values: ModelRatioPricingValues) => {
+      onChange('ModelPrice', values.ModelPrice)
+      onChange('ModelRatio', values.ModelRatio)
+      onChange('CacheRatio', values.CacheRatio)
+      onChange('CreateCacheRatio', values.CreateCacheRatio)
+      onChange('CompletionRatio', values.CompletionRatio)
+      onChange('ImageRatio', values.ImageRatio)
+      onChange('AudioRatio', values.AudioRatio)
+      onChange('AudioCompletionRatio', values.AudioCompletionRatio)
+      onChange('billing_setting.billing_mode', values.BillingMode)
+      onChange('billing_setting.billing_expr', values.BillingExpr)
+    },
+    [onChange]
+  )
 
-    const maps = {
-      ModelPrice: safeJsonParse<Record<string, number>>(modelPrice, { fallback: {}, silent: true }),
-      ModelRatio: safeJsonParse<Record<string, number>>(modelRatio, { fallback: {}, silent: true }),
-      CacheRatio: safeJsonParse<Record<string, number>>(cacheRatio, { fallback: {}, silent: true }),
-      CreateCacheRatio: safeJsonParse<Record<string, number>>(createCacheRatio, { fallback: {}, silent: true }),
-      CompletionRatio: safeJsonParse<Record<string, number>>(completionRatio, { fallback: {}, silent: true }),
-      ImageRatio: safeJsonParse<Record<string, number>>(imageRatio, { fallback: {}, silent: true }),
-      AudioRatio: safeJsonParse<Record<string, number>>(audioRatio, { fallback: {}, silent: true }),
-      AudioCompletionRatio: safeJsonParse<Record<string, number>>(audioCompletionRatio, { fallback: {}, silent: true }),
-      'billing_setting.billing_mode': safeJsonParse<Record<string, string>>(billingMode, { fallback: {}, silent: true }),
-      'billing_setting.billing_expr': safeJsonParse<Record<string, string>>(billingExpr, { fallback: {}, silent: true }),
-    }
-    names.forEach((name) => Object.values(maps).forEach((map) => delete map[name]))
-    Object.entries(maps).forEach(([field, map]) => onChange(field, JSON.stringify(map, null, 2)))
-    if (editData?.name && names.includes(editData.name)) {
-      setEditData(null)
-      setEditorOpen(false)
-      setSheetOpen(false)
-    }
-    table.resetRowSelection()
-    setShowBatchDeleteConfirm(false)
-    toast.success(t('Successfully deleted {{count}} model(s)', { count: names.length }))
-  }, [audioCompletionRatio, audioRatio, billingExpr, billingMode, cacheRatio, completionRatio, createCacheRatio, editData, imageRatio, modelPrice, modelRatio, onChange, t])
+  const handleDelete = useCallback(
+    async (name: string) => {
+      if (isSaving) return
+
+      try {
+        const values = getDeletedPricingValues([name])
+        await onPersist(values)
+        applyPricingValues(values)
+
+        if (editData?.name === name) {
+          setEditData(null)
+          setEditorOpen(false)
+          setSheetOpen(false)
+        }
+        toast.success(
+          t('Successfully deleted {{count}} model(s)', { count: 1 })
+        )
+      } catch {
+        // useUpdateOption already displays the request failure.
+      }
+    },
+    [
+      applyPricingValues,
+      editData,
+      getDeletedPricingValues,
+      isSaving,
+      onPersist,
+      t,
+    ]
+  )
 
   const columns = useMemo(
     () =>
       buildModelRatioColumns({
         onDelete: handleDelete,
         onEdit: handleEdit,
-        deleteDisabled: filterMode === 'unset',
+        deleteDisabled: filterMode === 'unset' || isSaving,
         t,
       }),
-    [handleEdit, handleDelete, filterMode, t]
+    [handleEdit, handleDelete, filterMode, isSaving, t]
   )
 
   const ensurePageInRange = useCallback((pageCount: number) => {
@@ -509,6 +467,40 @@ const ModelRatioVisualEditorComponent = forwardRef<
       return row.original.name.toLowerCase().includes(searchValue)
     },
   })
+
+  const handleBatchDelete = useCallback(async () => {
+    const names = table
+      .getFilteredSelectedRowModel()
+      .rows.map((row) => row.original.name)
+    if (names.length === 0 || isSaving) return
+
+    try {
+      const values = getDeletedPricingValues(names)
+      await onPersist(values)
+      applyPricingValues(values)
+
+      if (editData?.name && names.includes(editData.name)) {
+        setEditData(null)
+        setEditorOpen(false)
+        setSheetOpen(false)
+      }
+      table.resetRowSelection()
+      setShowBatchDeleteConfirm(false)
+      toast.success(
+        t('Successfully deleted {{count}} model(s)', { count: names.length })
+      )
+    } catch {
+      // useUpdateOption already displays the request failure.
+    }
+  }, [
+    applyPricingValues,
+    editData,
+    getDeletedPricingValues,
+    isSaving,
+    onPersist,
+    t,
+    table,
+  ])
 
   const persistPricingData = useCallback(
     (data: ModelRatioData, targetNames: string[] = [data.name]) => {
@@ -840,7 +832,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
           size='sm'
           variant='destructive'
           onClick={() => setShowBatchDeleteConfirm(true)}
-          disabled={filterMode === 'unset'}
+          disabled={filterMode === 'unset' || isSaving}
         >
           <Trash2 data-icon='inline-start' />
           {t('Delete selected')}
@@ -857,16 +849,26 @@ const ModelRatioVisualEditorComponent = forwardRef<
         open={showBatchDeleteConfirm}
         onOpenChange={setShowBatchDeleteConfirm}
         title={t('Delete Models?')}
-        description={t('Are you sure you want to delete {{count}} model(s)? This action cannot be undone.', {
-          count: table.getFilteredSelectedRowModel().rows.length,
-        })}
+        description={t(
+          'Are you sure you want to delete {{count}} model(s)? This action cannot be undone.',
+          {
+            count: table.getFilteredSelectedRowModel().rows.length,
+          }
+        )}
         contentHeight='auto'
         footer={
           <>
-            <Button variant='outline' onClick={() => setShowBatchDeleteConfirm(false)}>
+            <Button
+              variant='outline'
+              onClick={() => setShowBatchDeleteConfirm(false)}
+            >
               {t('Cancel')}
             </Button>
-            <Button variant='destructive' onClick={handleBatchDelete}>
+            <Button
+              variant='destructive'
+              onClick={handleBatchDelete}
+              disabled={isSaving}
+            >
               {t('Delete')}
             </Button>
           </>
@@ -920,6 +922,7 @@ export const ModelRatioVisualEditor = memo(
       prevProps.filterMode === nextProps.filterMode &&
       prevProps.onChange === nextProps.onChange &&
       prevProps.onSave === nextProps.onSave &&
+      prevProps.onPersist === nextProps.onPersist &&
       prevProps.isSaving === nextProps.isSaving
     )
   }
