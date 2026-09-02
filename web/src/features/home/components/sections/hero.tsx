@@ -42,7 +42,7 @@ export function Hero(props: HeroProps) {
       return (
         <Button
           variant='outline'
-          className='group border-[#344158] bg-white/[0.03] text-[#24334d] hover:border-[#5d7196] hover:bg-white/[0.07] inline-flex h-11 items-center gap-2 rounded-lg px-5 text-sm font-semibold dark:border-[#344158] dark:bg-white/[0.03] dark:text-[#dce6f7]'
+          className='group inline-flex h-11 items-center gap-2 rounded-lg border-[#344158] bg-white/[0.03] px-5 text-sm font-semibold text-[#24334d] hover:border-[#5d7196] hover:bg-white/[0.07] dark:border-[#344158] dark:bg-white/[0.03] dark:text-[#dce6f7]'
           render={
             <a href={docsUrl} target='_blank' rel='noopener noreferrer' />
           }
@@ -55,7 +55,7 @@ export function Hero(props: HeroProps) {
     return (
       <Button
         variant='outline'
-        className='group border-[#344158] bg-white/[0.03] text-[#24334d] hover:border-[#5d7196] hover:bg-white/[0.07] inline-flex h-11 items-center gap-2 rounded-lg px-5 text-sm font-semibold dark:border-[#344158] dark:bg-white/[0.03] dark:text-[#dce6f7]'
+        className='group inline-flex h-11 items-center gap-2 rounded-lg border-[#344158] bg-white/[0.03] px-5 text-sm font-semibold text-[#24334d] hover:border-[#5d7196] hover:bg-white/[0.07] dark:border-[#344158] dark:bg-white/[0.03] dark:text-[#dce6f7]'
         render={<Link to={docsUrl} />}
       >
         <BookOpen className='size-4 text-[#52627e] transition-colors duration-200 group-hover:text-[#24334d] dark:text-[#91a4c1] dark:group-hover:text-[#dce6f7]' />
@@ -65,7 +65,7 @@ export function Hero(props: HeroProps) {
   }
 
   return (
-    <section className='relative z-10 min-h-[100dvh] overflow-hidden bg-[#edf4fc] px-6 pt-24 pb-16 text-[#121b2c] dark:bg-[#090d16] dark:text-[#f5f7fa] md:pb-24 lg:pt-24 lg:pb-20'>
+    <section className='relative z-10 overflow-hidden bg-[#edf4fc] px-6 pt-24 pb-16 text-[#121b2c] md:pb-20 lg:pt-24 lg:pb-16 dark:bg-[#090d16] dark:text-[#f5f7fa]'>
       <div
         aria-hidden
         className='pointer-events-none absolute inset-0 -z-10 opacity-70 dark:opacity-100'
@@ -87,13 +87,13 @@ export function Hero(props: HeroProps) {
           </div>
 
           <h1
-            className='landing-animate-fade-up text-balance max-w-[11ch] text-[clamp(2.7rem,6.2vw,5.5rem)] leading-[0.98] font-semibold tracking-[0] opacity-0'
+            className='landing-animate-fade-up max-w-[11ch] text-[clamp(2.7rem,6.2vw,5.5rem)] leading-[0.98] font-semibold tracking-[0] text-balance opacity-0'
             style={{ animationDelay: '60ms' }}
           >
             {t('One Gateway. All Intelligence.')}
           </h1>
           <p
-            className='landing-animate-fade-up mt-7 max-w-[560px] text-base leading-8 text-[#52627e] opacity-0 dark:text-[#8d9bb3] sm:text-lg'
+            className='landing-animate-fade-up mt-7 max-w-[560px] text-base leading-8 text-[#52627e] opacity-0 sm:text-lg dark:text-[#8d9bb3]'
             style={{ animationDelay: '140ms' }}
           >
             {t(

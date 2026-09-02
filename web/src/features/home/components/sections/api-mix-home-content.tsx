@@ -179,7 +179,7 @@ export function ApiMixHomeContent({ isAuthenticated }: ApiMixHomeContentProps) {
         }}
       />
 
-      <section className='relative z-10 -mt-8 px-5 pb-12 sm:px-8 md:pb-16'>
+      <section className='relative z-10 -mt-12 px-5 pb-12 sm:px-8 md:pb-16'>
         <AnimateInView animation='scale-in' className='mx-auto max-w-6xl'>
           <div className='grid border-y border-[#cfdaea] md:grid-cols-4 dark:border-[#263247]'>
             {[
@@ -555,7 +555,7 @@ export function ApiMixHomeContent({ isAuthenticated }: ApiMixHomeContentProps) {
         </div>
       </section>
 
-      <section className='relative z-10 overflow-hidden border-t border-[#dbe5f2] px-5 py-24 sm:px-8 md:py-32 dark:border-[#202b3d]'>
+      <section className='relative z-10 overflow-hidden border-t border-[#dbe5f2] px-5 py-14 sm:px-8 md:py-16 dark:border-[#202b3d]'>
         <div
           aria-hidden
           className='absolute inset-0 opacity-50 dark:opacity-100'
