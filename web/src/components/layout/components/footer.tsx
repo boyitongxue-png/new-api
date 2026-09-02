@@ -42,12 +42,6 @@ interface FooterProps {
   hideCustomFooterHtml?: boolean
 }
 
-const NEW_API_FOOTER_ATTRIBUTION_KEY = [
-  'footer',
-  'new' + 'api',
-  'projectAttributionSuffix',
-].join('.')
-
 function FooterLinkItem(props: { link: FooterLink }) {
   const { t } = useTranslation()
   const isExternal = props.link.href.startsWith('http')
@@ -76,22 +70,10 @@ function FooterLinkItem(props: { link: FooterLink }) {
   )
 }
 
-// inline=true returns just the inner span for composition in a parent flex
-// row. inline=false wraps in a centered/right-aligned div (default).
 function ProjectAttribution(props: { currentYear: number; inline?: boolean }) {
-  const { t } = useTranslation()
   const content = (
     <span className='text-muted-foreground/45'>
-      &copy; {props.currentYear}{' '}
-      <a
-        href='https://github.com/QuantumNous/new-api'
-        target='_blank'
-        rel='noopener noreferrer'
-        className='text-foreground/70 hover:text-foreground font-medium transition-colors'
-      >
-        {t('New API')}
-      </a>
-      . {t(NEW_API_FOOTER_ATTRIBUTION_KEY)}
+      &copy; {props.currentYear} API MIX
     </span>
   )
   if (props.inline) {
@@ -189,7 +171,7 @@ export function Footer(props: FooterProps) {
           <div className='flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center'>
             <Link to='/' className='group flex items-center gap-2.5'>
               <img
-                src='/favicon-apimix.png'
+                src='/favicon-apimix.png?v=rc41'
                 alt='API MIX'
                 className='size-7 object-contain'
               />
