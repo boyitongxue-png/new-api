@@ -179,7 +179,7 @@ export function ApiMixHomeContent({ isAuthenticated }: ApiMixHomeContentProps) {
         }}
       />
 
-      <section className='relative z-10 -mt-12 px-5 pb-12 sm:px-8 md:pb-16'>
+      <section className='relative z-10 px-5 pb-12 sm:px-8 md:pb-16'>
         <AnimateInView animation='scale-in' className='mx-auto max-w-6xl'>
           <div className='grid border-y border-[#cfdaea] md:grid-cols-4 dark:border-[#263247]'>
             {[

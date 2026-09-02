@@ -73,7 +73,8 @@ describe('API MIX home layout', () => {
     )
     const capabilityStrip = contentContainer.querySelector('main > section')
 
-    expect(capabilityStrip).toHaveClass('-mt-12', 'pb-12', 'md:pb-16')
+    expect(capabilityStrip).toHaveClass('pb-12', 'md:pb-16')
+    expect(capabilityStrip).not.toHaveClass('-mt-12')
   })
 
   test('uses a compact final call to action', () => {

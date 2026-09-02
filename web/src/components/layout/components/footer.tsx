@@ -163,7 +163,7 @@ export function Footer(props: FooterProps) {
     return (
       <footer
         className={cn(
-          'border-border/40 relative z-10 border-t',
+          'border-border/40 relative z-10 border-t bg-[#f7faff] dark:bg-[#090d16]',
           props.className
         )}
       >
@@ -171,7 +171,7 @@ export function Footer(props: FooterProps) {
           <div className='flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center'>
             <Link to='/' className='group flex items-center gap-2.5'>
               <img
-                src='/favicon-apimix.png?v=rc42'
+                src='/favicon-apimix.png?v=rc43'
                 alt='API MIX'
                 className='size-7 object-contain'
               />
