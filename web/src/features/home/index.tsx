@@ -124,7 +124,7 @@ export function Home() {
     <PublicLayout showMainContainer={false}>
       <Hero isAuthenticated={isAuthenticated} />
       <ApiMixHomeContent isAuthenticated={isAuthenticated} />
-      <Footer />
+      <Footer hideCustomFooterHtml />
     </PublicLayout>
   )
 }

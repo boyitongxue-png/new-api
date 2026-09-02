@@ -179,9 +179,9 @@ export function ApiMixHomeContent({ isAuthenticated }: ApiMixHomeContentProps) {
         }}
       />
 
-      <section className='relative z-10 -mt-8 px-5 pb-20 sm:px-8 md:pb-28'>
+      <section className='relative z-10 -mt-8 px-5 pb-12 sm:px-8 md:pb-16'>
         <AnimateInView animation='scale-in' className='mx-auto max-w-6xl'>
-          <div className='grid overflow-hidden border border-[#cfdaea] bg-white shadow-[0_24px_70px_rgba(39,82,144,.12)] md:grid-cols-4 dark:border-[#263247] dark:bg-[#0d1320]'>
+          <div className='grid border-y border-[#cfdaea] md:grid-cols-4 dark:border-[#263247]'>
             {[
               [
                 Cpu,
@@ -203,20 +203,28 @@ export function ApiMixHomeContent({ isAuthenticated }: ApiMixHomeContentProps) {
                 'Account controls',
                 'Manage access with API keys and roles',
               ],
-            ].map(([Icon, label, description]) => {
+            ].map(([Icon, label, description], index) => {
               const StatIcon = Icon as typeof Cpu
               return (
                 <div
                   key={label as string}
-                  className='border-[#dbe4f1] px-6 py-7 text-center not-last:border-b md:not-last:border-r md:not-last:border-b-0 dark:border-[#202b3d]'
+                  className={cn(
+                    'flex items-start gap-3 px-1 py-5 md:px-6 md:py-6',
+                    index > 0 &&
+                      'border-t border-[#dbe4f1] md:border-l md:border-t-0 dark:border-[#202b3d]'
+                  )}
                 >
-                  <StatIcon className='mx-auto mb-3 size-5 text-[#2f80ed] dark:text-[#64a9ff]' />
-                  <p className='text-base font-semibold'>
-                    {t(label as string)}
-                  </p>
-                  <p className='mt-2 text-xs leading-5 text-[#64738c] dark:text-[#8594ae]'>
-                    {t(description as string)}
-                  </p>
+                  <div className='mt-0.5 flex size-8 shrink-0 items-center justify-center bg-[#eaf3ff] text-[#2f80ed] dark:bg-[#142b49] dark:text-[#75b5ff]'>
+                    <StatIcon className='size-4' />
+                  </div>
+                  <div className='min-w-0'>
+                    <p className='text-sm font-semibold'>
+                      {t(label as string)}
+                    </p>
+                    <p className='mt-1 text-xs leading-5 text-[#64738c] dark:text-[#8594ae]'>
+                      {t(description as string)}
+                    </p>
+                  </div>
                 </div>
               )
             })}

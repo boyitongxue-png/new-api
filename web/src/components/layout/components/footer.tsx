@@ -39,6 +39,7 @@ interface FooterProps {
   columns?: FooterColumnProps[]
   copyright?: string
   className?: string
+  hideCustomFooterHtml?: boolean
 }
 
 const NEW_API_FOOTER_ATTRIBUTION_KEY = [
@@ -176,6 +177,33 @@ export function Footer(props: FooterProps) {
 
   const displayColumns = props.columns ?? fallbackColumns
 
+  if (props.hideCustomFooterHtml) {
+    return (
+      <footer
+        className={cn(
+          'border-border/40 relative z-10 border-t',
+          props.className
+        )}
+      >
+        <div className='mx-auto w-full max-w-6xl px-5 py-7 sm:px-8'>
+          <div className='flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center'>
+            <Link to='/' className='group flex items-center gap-2.5'>
+              <img
+                src='/favicon-apimix.png'
+                alt='API MIX'
+                className='size-7 object-contain'
+              />
+              <span className='text-sm font-semibold tracking-tight'>
+                API MIX
+              </span>
+            </Link>
+            <ProjectAttribution currentYear={currentYear} />
+          </div>
+        </div>
+      </footer>
+    )
+  }
+
   if (footerHtml) {
     return (
       <footer
@@ -223,14 +251,14 @@ export function Footer(props: FooterProps) {
           {/* Links columns */}
           {isDemoSiteMode && (
             <div className='grid grid-cols-3 gap-8 md:gap-16'>
-              {displayColumns.map((column, index) => (
-                <div key={index}>
+              {displayColumns.map((column) => (
+                <div key={column.title}>
                   <p className='text-muted-foreground/50 mb-3 text-xs font-medium tracking-wider uppercase'>
                     {t(column.title)}
                   </p>
                   <ul className='space-y-2.5'>
-                    {column.links.map((link, linkIndex) => (
-                      <li key={linkIndex}>
+                    {column.links.map((link) => (
+                      <li key={link.href}>
                         <FooterLinkItem link={link} />
                       </li>
                     ))}
