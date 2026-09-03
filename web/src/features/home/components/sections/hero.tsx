@@ -17,11 +17,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, BookOpen, Check } from 'lucide-react'
+import { ArrowRight, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { useStatus } from '@/hooks/use-status'
 
 import { HeroTerminalDemo } from '../hero-terminal-demo'
 
@@ -32,37 +31,6 @@ interface HeroProps {
 
 export function Hero(props: HeroProps) {
   const { t } = useTranslation()
-  const { status } = useStatus()
-  const docsUrl =
-    (status?.docs_link as string | undefined) || 'https://docs.newapi.pro'
-
-  const renderDocsButton = () => {
-    const isExternal = docsUrl.startsWith('http')
-    if (isExternal) {
-      return (
-        <Button
-          variant='outline'
-          className='group inline-flex h-11 items-center gap-2 rounded-lg border-[#344158] bg-white/[0.03] px-5 text-sm font-semibold text-[#24334d] hover:border-[#5d7196] hover:bg-white/[0.07] dark:border-[#344158] dark:bg-white/[0.03] dark:text-[#dce6f7]'
-          render={
-            <a href={docsUrl} target='_blank' rel='noopener noreferrer' />
-          }
-        >
-          <BookOpen className='size-4 text-[#52627e] transition-colors duration-200 group-hover:text-[#24334d] dark:text-[#91a4c1] dark:group-hover:text-[#dce6f7]' />
-          <span>{t('Read documentation')}</span>
-        </Button>
-      )
-    }
-    return (
-      <Button
-        variant='outline'
-        className='group inline-flex h-11 items-center gap-2 rounded-lg border-[#344158] bg-white/[0.03] px-5 text-sm font-semibold text-[#24334d] hover:border-[#5d7196] hover:bg-white/[0.07] dark:border-[#344158] dark:bg-white/[0.03] dark:text-[#dce6f7]'
-        render={<Link to={docsUrl} />}
-      >
-        <BookOpen className='size-4 text-[#52627e] transition-colors duration-200 group-hover:text-[#24334d] dark:text-[#91a4c1] dark:group-hover:text-[#dce6f7]' />
-        <span>{t('Read documentation')}</span>
-      </Button>
-    )
-  }
 
   return (
     <section className='relative z-10 overflow-hidden bg-[#edf4fc] px-6 pt-24 pb-16 text-[#121b2c] md:pb-20 lg:pt-24 lg:pb-16 dark:bg-[#090d16] dark:text-[#f5f7fa]'>
@@ -106,27 +74,21 @@ export function Hero(props: HeroProps) {
             style={{ animationDelay: '220ms' }}
           >
             {props.isAuthenticated ? (
-              <>
-                <Button
-                  className='group h-11 rounded-lg bg-[#2f80ed] px-5 text-sm font-semibold text-white hover:bg-[#4392ff] active:translate-y-px'
-                  render={<Link to='/dashboard' />}
-                >
-                  {t('Go to Dashboard')}
-                  <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
-                </Button>
-                {renderDocsButton()}
-              </>
+              <Button
+                className='group h-11 rounded-lg bg-[#2f80ed] px-5 text-sm font-semibold text-white hover:bg-[#4392ff] active:translate-y-px'
+                render={<Link to='/dashboard' />}
+              >
+                {t('Go to Dashboard')}
+                <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
+              </Button>
             ) : (
-              <>
-                <Button
-                  className='group h-11 rounded-lg bg-[#2f80ed] px-5 text-sm font-semibold text-white hover:bg-[#4392ff] active:translate-y-px'
-                  render={<Link to='/sign-up' />}
-                >
-                  {t('Build with API MIX')}
-                  <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
-                </Button>
-                {renderDocsButton()}
-              </>
+              <Button
+                className='group h-11 rounded-lg bg-[#2f80ed] px-5 text-sm font-semibold text-white hover:bg-[#4392ff] active:translate-y-px'
+                render={<Link to='/sign-up' />}
+              >
+                {t('Build with API MIX')}
+                <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
+              </Button>
             )}
           </div>
 
