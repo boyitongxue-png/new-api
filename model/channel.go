@@ -163,13 +163,44 @@ func ApplyChannelGroupFilter(query *gorm.DB, group string) *gorm.DB {
 
 // Value implements driver.Valuer interface
 func (c ChannelInfo) Value() (driver.Value, error) {
-	return common.Marshal(&c)
+	data, err := common.Marshal(&c)
+	if err != nil {
+		return nil, err
+	}
+	// PostgreSQL simple protocol treats []byte parameters as bytea. Return JSON
+	// as text so writes to the json column remain valid when prepared statements
+	// are disabled.
+	return string(data), nil
 }
 
-// Scan implements sql.Scanner interface
+// Scan implements sql.Scanner interface.
+//
+// Older channel rows may have a NULL channel_info value because the column was
+// added after the row was created. Database drivers can also return JSON text
+// as either []byte or string, so normalize those representations before
+// decoding.
 func (c *ChannelInfo) Scan(value interface{}) error {
-	bytesValue, _ := value.([]byte)
-	return common.Unmarshal(bytesValue, c)
+	if value == nil {
+		*c = ChannelInfo{}
+		return nil
+	}
+
+	var data []byte
+	switch value := value.(type) {
+	case []byte:
+		data = value
+	case string:
+		data = []byte(value)
+	default:
+		return fmt.Errorf("unsupported channel_info scan value type %T", value)
+	}
+
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == "null" {
+		*c = ChannelInfo{}
+		return nil
+	}
+	return common.Unmarshal(data, c)
 }
 
 func (channel *Channel) GetKeys() []string {
