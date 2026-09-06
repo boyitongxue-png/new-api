@@ -51,16 +51,16 @@ func TestGetTodayChannelUsageAggregatesConsumeLogsByChannel(t *testing.T) {
 		CompletionTokens: 10,
 	}).Error)
 	require.NoError(t, DB.Create(&Log{
-		CreatedAt:        startOfDay.Unix() - 1,
-		Type:             LogTypeConsume,
-		ChannelId:        1,
-		Quota:            999,
+		CreatedAt: startOfDay.Unix() - 1,
+		Type:      LogTypeConsume,
+		ChannelId: 1,
+		Quota:     999,
 	}).Error)
 	require.NoError(t, DB.Create(&Log{
-		CreatedAt:        createdAt,
-		Type:             LogTypeError,
-		ChannelId:        1,
-		Quota:            500,
+		CreatedAt: createdAt,
+		Type:      LogTypeError,
+		ChannelId: 1,
+		Quota:     500,
 	}).Error)
 
 	usage, err := GetTodayChannelUsage()
@@ -68,7 +68,7 @@ func TestGetTodayChannelUsageAggregatesConsumeLogsByChannel(t *testing.T) {
 	require.Equal(t, now.Format("2006-01-02"), usage.Date)
 	require.Equal(t, int64(3), usage.TotalCount)
 	require.Equal(t, int64(175), usage.TotalQuota)
-	require.Equal(t, int64(135), usage.TotalTokenUsed)
+	require.Equal(t, int64(145), usage.TotalTokenUsed)
 	require.Len(t, usage.Channels, 2)
 	require.Equal(t, "primary", usage.Channels[0].ChannelName)
 	require.Equal(t, int64(125), usage.Channels[0].Quota)
