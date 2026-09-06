@@ -40,6 +40,7 @@ interface FooterProps {
   columns?: FooterColumnProps[]
   copyright?: string
   className?: string
+  hideCustomFooterHtml?: boolean
 }
 
 const NEW_API_FOOTER_ATTRIBUTION_KEY = [
@@ -221,6 +222,33 @@ export function Footer(props: FooterProps) {
   )
 
   const displayColumns = props.columns ?? fallbackColumns
+
+  if (props.hideCustomFooterHtml) {
+    return (
+      <footer
+        className={cn(
+          'border-border/40 relative z-10 border-t bg-[#f7faff] dark:bg-[#090d16]',
+          props.className
+        )}
+      >
+        <div className='mx-auto w-full max-w-6xl px-5 py-7 sm:px-8'>
+          <div className='flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center'>
+            <Link to='/' className='group flex items-center gap-2.5'>
+              <img
+                src='/favicon-apimix.png?v=rc45'
+                alt='API MIX'
+                className='size-7 object-contain'
+              />
+              <span className='text-sm font-semibold tracking-tight'>
+                API MIX
+              </span>
+            </Link>
+            <ProjectAttribution currentYear={currentYear} />
+          </div>
+        </div>
+      </footer>
+    )
+  }
 
   if (footerHtml) {
     return (
