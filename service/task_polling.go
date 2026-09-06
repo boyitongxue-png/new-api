@@ -614,8 +614,14 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 			task.FinishTime = now
 		}
 		if constant.IsVideoTaskChannelType(ch.Type) {
-			// Every asynchronous video exposes the same shareable local .mp4 URL.
-			task.PrivateData.ResultURL = taskcommon.BuildPublicVideoURL(task.TaskID)
+			// Only publish a local URL after the provider result has been cached.
+			// A provider-successful task may remain temporarily unavailable while
+			// the independent cache retry worker repairs a failed local write.
+			if localVideoURL != "" {
+				task.PrivateData.ResultURL = localVideoURL
+			} else {
+				task.PrivateData.ResultURL = ""
+			}
 		} else if taskResult.Url != "" {
 			task.PrivateData.ResultURL = taskResult.Url
 		} else {

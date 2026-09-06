@@ -192,7 +192,7 @@ func (a *completedVideoPollingAdaptor) AdjustBillingOnComplete(_ *model.Task, _ 
 	return 0
 }
 
-func TestUpdateVideoSingleTaskDoesNotPublishBeforeCacheSucceeds(t *testing.T) {
+func TestUpdateVideoSingleTaskKeepsProviderSuccessWhenCacheFails(t *testing.T) {
 	truncate(t)
 	t.Setenv("VIDEO_CACHE_DIR", t.TempDir())
 	previousTimeout := constant.TaskTerminalErrorTimeoutMinutes
@@ -220,8 +220,8 @@ func TestUpdateVideoSingleTaskDoesNotPublishBeforeCacheSucceeds(t *testing.T) {
 
 	var saved model.Task
 	require.NoError(t, model.DB.Where("task_id = ?", task.TaskID).First(&saved).Error)
-	assert.Equal(t, model.TaskStatus(model.TaskStatusInProgress), saved.Status)
-	assert.Equal(t, "95%", saved.Progress)
+	assert.Equal(t, model.TaskStatus(model.TaskStatusSuccess), saved.Status)
+	assert.Equal(t, taskcommon.ProgressComplete, saved.Progress)
 	assert.Empty(t, saved.PrivateData.ResultURL)
 	assert.Equal(t, "ftp://provider.example/video.mp4", saved.PrivateData.UpstreamResultURL)
 	assert.NotContains(t, string(saved.Data), "provider.example")
@@ -308,7 +308,7 @@ func TestUpdateVideoSingleTaskCachesCompletedRemoteVideoOnTrustedPort(t *testing
 	assert.FileExists(t, filepath.Join(cacheDir, task.TaskID+".mp4"))
 }
 
-func TestUpdateVideoSingleTaskFailsExpiredCacheError(t *testing.T) {
+func TestUpdateVideoSingleTaskKeepsProviderSuccessAfterCacheFailure(t *testing.T) {
 	truncate(t)
 	t.Setenv("VIDEO_CACHE_DIR", t.TempDir())
 
@@ -339,9 +339,11 @@ func TestUpdateVideoSingleTaskFailsExpiredCacheError(t *testing.T) {
 
 	var saved model.Task
 	require.NoError(t, model.DB.Where("task_id = ?", task.TaskID).First(&saved).Error)
-	assert.Equal(t, model.TaskStatus(model.TaskStatusFailure), saved.Status)
+	assert.Equal(t, model.TaskStatus(model.TaskStatusSuccess), saved.Status)
 	assert.Equal(t, taskcommon.ProgressComplete, saved.Progress)
-	assert.Contains(t, saved.FailReason, "failed to cache completed video")
+	assert.Empty(t, saved.PrivateData.ResultURL)
+	assert.NotEmpty(t, saved.PrivateData.VideoCacheLastError)
+	assert.NotZero(t, saved.PrivateData.VideoCacheAttempts)
 }
 
 func TestUpdateVideoTasksDefaultSleepWaitsBetweenTasks(t *testing.T) {
