@@ -255,6 +255,122 @@ export interface LogStatistics {
   tpm: number
 }
 
+export interface ModelCostStatistic {
+  model_name: string
+  channel_id: number
+  currency: string
+  request_count: number
+  success_count: number
+  failure_count: number
+  prompt_tokens: number
+  completion_tokens: number
+  cached_tokens: number
+  cache_creation_tokens: number
+  image_tokens: number
+  audio_tokens: number
+  audio_input_tokens: number
+  audio_output_tokens: number
+  image_count: number
+  audio_seconds: number
+  audio_output_seconds: number
+  video_seconds: number
+  total_tokens: number
+  actual_cost_micros: number
+  revenue_micros: number
+  gross_profit_micros: number
+  profit_rate: number
+  usage_missing_count: number
+}
+
+export interface CostStatistics {
+  rows: ModelCostStatistic[]
+  currency: string
+  mixed_currency: boolean
+  request_count: number
+  success_count: number
+  failure_count: number
+  prompt_tokens: number
+  completion_tokens: number
+  cached_tokens: number
+  audio_tokens: number
+  audio_input_tokens: number
+  audio_output_tokens: number
+  image_count: number
+  audio_seconds: number
+  video_seconds: number
+  total_tokens: number
+  actual_cost_micros: number
+  revenue_micros: number
+  gross_profit_micros: number
+  profit_rate: number
+}
+
+export interface CostStatisticsResponse {
+  success: boolean
+  message?: string
+  data?: CostStatistics
+}
+
+/**
+ * Safe request-level projection returned by GET /api/cost-statistics/logs.
+ * The endpoint must not return request content, token names, IP addresses,
+ * provider credentials, or the raw `other` payload.
+ */
+export interface CostStatisticsLog {
+  id: number
+  user_id: number
+  created_at: number
+  type: number
+  model_name: string
+  username?: string
+  channel_id: number
+  group?: string
+  request_id?: string
+  upstream_request_id?: string
+  status?: string
+  success?: boolean
+  quota: number
+  prompt_tokens: number
+  completion_tokens: number
+  cached_tokens: number
+  audio_input_tokens: number
+  audio_output_tokens: number
+  image_count: number
+  audio_seconds: number
+  audio_output_seconds: number
+  video_seconds: number
+  total_tokens: number
+  actual_cost_micros: number
+  revenue_micros: number
+  gross_profit_micros: number
+  profit_rate: number
+  currency: string
+  usage_available: boolean
+  billing_event?: string
+}
+
+export interface CostStatisticsLogsParams {
+  model_name: string
+  channel?: number
+  username?: string
+  group?: string
+  start_timestamp?: number
+  end_timestamp?: number
+  page?: number
+  page_size?: number
+}
+
+export interface CostStatisticsLogsResponse {
+  success: boolean
+  message?: string
+  data?: {
+    items: CostStatisticsLog[]
+    total: number
+    page: number
+    page_size: number
+  }
+}
+
 // ============================================================================
 // Drawing Logs (MjProxy) Types
 // ============================================================================

@@ -57,27 +57,43 @@ func sanitizeClickHouseLikePattern(input string) (string, error) {
 }
 
 type Log struct {
-	Id                int    `json:"id" gorm:"index:idx_created_at_id,priority:2;index:idx_user_id_id,priority:2"`
-	UserId            int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1"`
-	CreatedAt         int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:1;index:idx_created_at_type"`
-	Type              int    `json:"type" gorm:"index:idx_created_at_type"`
-	Content           string `json:"content"`
-	Username          string `json:"username" gorm:"index;index:index_username_model_name,priority:2;default:''"`
-	TokenName         string `json:"token_name" gorm:"index;default:''"`
-	ModelName         string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
-	Quota             int    `json:"quota" gorm:"default:0"`
-	PromptTokens      int    `json:"prompt_tokens" gorm:"default:0"`
-	CompletionTokens  int    `json:"completion_tokens" gorm:"default:0"`
-	UseTime           int    `json:"use_time" gorm:"default:0"`
-	IsStream          bool   `json:"is_stream"`
-	ChannelId         int    `json:"channel" gorm:"index"`
-	ChannelName       string `json:"channel_name" gorm:"->"`
-	TokenId           int    `json:"token_id" gorm:"default:0;index"`
-	Group             string `json:"group" gorm:"index"`
-	Ip                string `json:"ip" gorm:"index;default:''"`
-	RequestId         string `json:"request_id,omitempty" gorm:"type:varchar(64);index:idx_logs_request_id;default:''"`
-	UpstreamRequestId string `json:"upstream_request_id,omitempty" gorm:"type:varchar(128);index:idx_logs_upstream_request_id;default:''"`
-	Other             string `json:"other"`
+	Id                  int    `json:"id" gorm:"index:idx_created_at_id,priority:2;index:idx_user_id_id,priority:2"`
+	UserId              int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1"`
+	CreatedAt           int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:1;index:idx_created_at_type"`
+	Type                int    `json:"type" gorm:"index:idx_created_at_type"`
+	Content             string `json:"content"`
+	Username            string `json:"username" gorm:"index;index:index_username_model_name,priority:2;default:''"`
+	TokenName           string `json:"token_name" gorm:"index;default:''"`
+	ModelName           string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
+	Quota               int    `json:"quota" gorm:"default:0"`
+	PromptTokens        int    `json:"prompt_tokens" gorm:"default:0"`
+	CompletionTokens    int    `json:"completion_tokens" gorm:"default:0"`
+	UseTime             int    `json:"use_time" gorm:"default:0"`
+	IsStream            bool   `json:"is_stream"`
+	ChannelId           int    `json:"channel" gorm:"index"`
+	ChannelName         string `json:"channel_name" gorm:"->"`
+	TokenId             int    `json:"token_id" gorm:"default:0;index"`
+	Group               string `json:"group" gorm:"index"`
+	Ip                  string `json:"ip" gorm:"index;default:''"`
+	RequestId           string `json:"request_id,omitempty" gorm:"type:varchar(64);index:idx_logs_request_id;default:''"`
+	UpstreamRequestId   string `json:"upstream_request_id,omitempty" gorm:"type:varchar(128);index:idx_logs_upstream_request_id;default:''"`
+	Other               string `json:"other"`
+	CachedTokens        int    `json:"cached_tokens" gorm:"default:0"`
+	CacheCreationTokens int    `json:"cache_creation_tokens" gorm:"default:0"`
+	ImageTokens         int    `json:"image_tokens" gorm:"default:0"`
+	AudioTokens         int    `json:"audio_tokens" gorm:"default:0"`
+	AudioInputTokens    int    `json:"audio_input_tokens" gorm:"default:0"`
+	AudioOutputTokens   int    `json:"audio_output_tokens" gorm:"default:0"`
+	ImageCount          int    `json:"image_count" gorm:"default:0"`
+	AudioSeconds        int    `json:"audio_seconds" gorm:"default:0"`
+	AudioOutputSeconds  int    `json:"audio_output_seconds" gorm:"default:0"`
+	VideoSeconds        int    `json:"video_seconds" gorm:"default:0"`
+	ActualCostMicros    int64  `json:"-" gorm:"default:0"`
+	RevenueMicros       int64  `json:"-" gorm:"default:0"`
+	CostCurrency        string `json:"-" gorm:"size:8;default:''"`
+	CostSource          string `json:"-" gorm:"size:128;default:''"`
+	UsageAvailable      bool   `json:"-"`
+	BillingEvent        string `json:"billing_event" gorm:"size:16;index;default:'request'"`
 }
 
 // don't use iota, avoid change log type value
@@ -335,18 +351,29 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 }
 
 type RecordConsumeLogParams struct {
-	ChannelId        int                    `json:"channel_id"`
-	PromptTokens     int                    `json:"prompt_tokens"`
-	CompletionTokens int                    `json:"completion_tokens"`
-	ModelName        string                 `json:"model_name"`
-	TokenName        string                 `json:"token_name"`
-	Quota            int                    `json:"quota"`
-	Content          string                 `json:"content"`
-	TokenId          int                    `json:"token_id"`
-	UseTimeSeconds   int                    `json:"use_time_seconds"`
-	IsStream         bool                   `json:"is_stream"`
-	Group            string                 `json:"group"`
-	Other            map[string]interface{} `json:"other"`
+	ChannelId           int                    `json:"channel_id"`
+	PromptTokens        int                    `json:"prompt_tokens"`
+	CompletionTokens    int                    `json:"completion_tokens"`
+	ModelName           string                 `json:"model_name"`
+	TokenName           string                 `json:"token_name"`
+	Quota               int                    `json:"quota"`
+	Content             string                 `json:"content"`
+	TokenId             int                    `json:"token_id"`
+	UseTimeSeconds      int                    `json:"use_time_seconds"`
+	IsStream            bool                   `json:"is_stream"`
+	Group               string                 `json:"group"`
+	Other               map[string]interface{} `json:"other"`
+	CachedTokens        int                    `json:"cached_tokens"`
+	CacheCreationTokens int                    `json:"cache_creation_tokens"`
+	ImageTokens         int                    `json:"image_tokens"`
+	AudioTokens         int                    `json:"audio_tokens"`
+	AudioInputTokens    int                    `json:"audio_input_tokens"`
+	AudioOutputTokens   int                    `json:"audio_output_tokens"`
+	ImageCount          int                    `json:"image_count"`
+	AudioSeconds        int                    `json:"audio_seconds"`
+	AudioOutputSeconds  int                    `json:"audio_output_seconds"`
+	VideoSeconds        int                    `json:"video_seconds"`
+	UsageAvailable      bool                   `json:"usage_available"`
 }
 
 func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams) {
@@ -359,6 +386,33 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	createdAt := common.GetTimestamp()
 	otherStr := common.MapToJsonStr(params.Other)
+	accounting := CalculateCostAccountingWithUsage(params.ModelName, params.ChannelId, params.Quota, CostUsage{
+		UsageAvailable:      params.UsageAvailable,
+		PromptTokens:        int64(params.PromptTokens),
+		CompletionTokens:    int64(params.CompletionTokens),
+		CachedTokens:        int64(params.CachedTokens),
+		CacheCreationTokens: int64(params.CacheCreationTokens),
+		ImageTokens:         int64(params.ImageTokens),
+		AudioInputTokens:    int64(params.AudioInputTokens),
+		AudioOutputTokens:   int64(params.AudioOutputTokens),
+		AudioSeconds:        int64(params.AudioSeconds),
+		AudioOutputSeconds:  int64(params.AudioOutputSeconds),
+		ImageCount:          int64(params.ImageCount),
+		VideoSeconds:        int64(params.VideoSeconds),
+		IncludeRequestFee:   true,
+	})
+	if params.Other == nil {
+		params.Other = map[string]interface{}{}
+	}
+	adminInfo, ok := params.Other["admin_info"].(map[string]interface{})
+	if !ok || adminInfo == nil {
+		adminInfo = map[string]interface{}{}
+		params.Other["admin_info"] = adminInfo
+	}
+	if accounting.Source != "" {
+		adminInfo["cost_snapshot"] = accounting
+	}
+	otherStr = common.MapToJsonStr(params.Other)
 	// 判断是否需要记录 IP
 	needRecordIp := false
 	if settingMap, err := GetUserSetting(userId, false); err == nil {
@@ -388,9 +442,25 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 			}
 			return ""
 		}(),
-		RequestId:         requestId,
-		UpstreamRequestId: upstreamRequestId,
-		Other:             otherStr,
+		RequestId:           requestId,
+		UpstreamRequestId:   upstreamRequestId,
+		Other:               otherStr,
+		CachedTokens:        params.CachedTokens,
+		CacheCreationTokens: params.CacheCreationTokens,
+		ImageTokens:         params.ImageTokens,
+		AudioTokens:         params.AudioTokens,
+		AudioInputTokens:    params.AudioInputTokens,
+		AudioOutputTokens:   params.AudioOutputTokens,
+		ImageCount:          params.ImageCount,
+		AudioSeconds:        params.AudioSeconds,
+		AudioOutputSeconds:  params.AudioOutputSeconds,
+		VideoSeconds:        params.VideoSeconds,
+		ActualCostMicros:    accounting.ActualCostMicros,
+		RevenueMicros:       accounting.RevenueMicros,
+		CostCurrency:        accounting.Currency,
+		CostSource:          accounting.Source,
+		UsageAvailable:      accounting.UsageAvailable,
+		BillingEvent:        "request",
 	}
 	err := createLog(log)
 	if err != nil {
@@ -450,7 +520,8 @@ type RecordTaskBillingLogParams struct {
 	TokenId   int
 	Group     string
 	Other     map[string]interface{}
-	NodeName  string // 任务发起节点；为空时回退当前节点
+	NodeName  string     // 任务发起节点；为空时回退当前节点
+	CostUsage *CostUsage // 完成阶段的上游实际 usage 快照
 }
 
 func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
@@ -465,19 +536,73 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		}
 	}
 	createdAt := common.GetTimestamp()
+	billingEvent := "request"
+	if params.LogType == LogTypeRefund {
+		billingEvent = "refund"
+	} else if _, ok := params.Other["pre_consumed_quota"]; ok {
+		billingEvent = "settlement"
+	}
+	quotaForRevenue := params.Quota
+	if params.LogType == LogTypeRefund {
+		quotaForRevenue = -quotaForRevenue
+	}
+	usage := CostUsage{}
+	if params.CostUsage != nil && params.LogType != LogTypeRefund {
+		usage = *params.CostUsage
+	} else if params.CostUsage == nil && params.LogType != LogTypeRefund {
+		// Legacy task logs represent a completed billable request but have no
+		// measured dimensions. Preserve the configured per-request fee without
+		// inventing token usage.
+		usage.IncludeRequestFee = true
+	}
+	// Refunds adjust user funding and must never create a second upstream cost.
+	if params.LogType == LogTypeRefund {
+		usage = CostUsage{}
+	}
+	accounting := CalculateCostAccountingWithUsage(params.ModelName, params.ChannelId, quotaForRevenue, usage)
+	other := params.Other
+	if other == nil {
+		other = map[string]interface{}{}
+	}
+	adminInfo, ok := other["admin_info"].(map[string]interface{})
+	if !ok || adminInfo == nil {
+		adminInfo = map[string]interface{}{}
+		other["admin_info"] = adminInfo
+	}
+	if accounting.Source != "" {
+		adminInfo["cost_snapshot"] = accounting
+	}
 	log := &Log{
-		UserId:    params.UserId,
-		Username:  username,
-		CreatedAt: createdAt,
-		Type:      params.LogType,
-		Content:   params.Content,
-		TokenName: tokenName,
-		ModelName: params.ModelName,
-		Quota:     params.Quota,
-		ChannelId: params.ChannelId,
-		TokenId:   params.TokenId,
-		Group:     params.Group,
-		Other:     common.MapToJsonStr(params.Other),
+		UserId:              params.UserId,
+		Username:            username,
+		CreatedAt:           createdAt,
+		Type:                params.LogType,
+		Content:             params.Content,
+		TokenName:           tokenName,
+		ModelName:           params.ModelName,
+		Quota:               params.Quota,
+		ChannelId:           params.ChannelId,
+		TokenId:             params.TokenId,
+		Group:               params.Group,
+		Other:               common.MapToJsonStr(other),
+		PromptTokens:        int(usage.PromptTokens),
+		CompletionTokens:    int(usage.CompletionTokens),
+		CachedTokens:        int(usage.CachedTokens),
+		CacheCreationTokens: int(usage.CacheCreationTokens),
+		ImageTokens:         int(usage.ImageTokens),
+		AudioTokens:         int(usage.AudioInputTokens + usage.AudioOutputTokens),
+		AudioInputTokens:    int(usage.AudioInputTokens),
+		AudioOutputTokens:   int(usage.AudioOutputTokens),
+		ImageCount:          int(usage.ImageCount),
+		AudioSeconds:        int(usage.AudioSeconds),
+		AudioOutputSeconds:  int(usage.AudioOutputSeconds),
+		VideoSeconds:        int(usage.VideoSeconds),
+		ActualCostMicros:    accounting.ActualCostMicros,
+		RevenueMicros:       accounting.RevenueMicros,
+		CostCurrency:        accounting.Currency,
+		CostSource:          accounting.Source,
+		UsageAvailable:      usage.UsageAvailable,
+		BillingEvent:        billingEvent,
 	}
 	err := createLog(log)
 	if err != nil {

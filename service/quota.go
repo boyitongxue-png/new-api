@@ -246,18 +246,22 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 	}
 	attachQuotaSaturation(ctx, relayInfo, other)
 	model.RecordConsumeLog(ctx, relayInfo.UserId, model.RecordConsumeLogParams{
-		ChannelId:        relayInfo.ChannelId,
-		PromptTokens:     usage.InputTokens,
-		CompletionTokens: usage.OutputTokens,
-		ModelName:        logModel,
-		TokenName:        tokenName,
-		Quota:            quota,
-		Content:          logContent,
-		TokenId:          relayInfo.TokenId,
-		UseTimeSeconds:   int(useTimeSeconds),
-		IsStream:         relayInfo.IsStream,
-		Group:            relayInfo.UsingGroup,
-		Other:            other,
+		ChannelId:         relayInfo.ChannelId,
+		PromptTokens:      usage.InputTokens,
+		CompletionTokens:  usage.OutputTokens,
+		ModelName:         logModel,
+		TokenName:         tokenName,
+		Quota:             quota,
+		Content:           logContent,
+		TokenId:           relayInfo.TokenId,
+		UseTimeSeconds:    int(useTimeSeconds),
+		IsStream:          relayInfo.IsStream,
+		Group:             relayInfo.UsingGroup,
+		Other:             other,
+		AudioTokens:       audioInputTokens + audioOutTokens,
+		AudioInputTokens:  audioInputTokens,
+		AudioOutputTokens: audioOutTokens,
+		UsageAvailable:    usage.TotalTokens != 0 || usage.InputTokens != 0 || usage.OutputTokens != 0,
 	})
 }
 
@@ -369,18 +373,25 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 	}
 	attachQuotaSaturation(ctx, relayInfo, other)
 	model.RecordConsumeLog(ctx, relayInfo.UserId, model.RecordConsumeLogParams{
-		ChannelId:        relayInfo.ChannelId,
-		PromptTokens:     usage.PromptTokens,
-		CompletionTokens: usage.CompletionTokens,
-		ModelName:        logModel,
-		TokenName:        tokenName,
-		Quota:            quota,
-		Content:          logContent,
-		TokenId:          relayInfo.TokenId,
-		UseTimeSeconds:   int(useTimeSeconds),
-		IsStream:         relayInfo.IsStream,
-		Group:            relayInfo.UsingGroup,
-		Other:            other,
+		ChannelId:          relayInfo.ChannelId,
+		PromptTokens:       usage.PromptTokens,
+		CompletionTokens:   usage.CompletionTokens,
+		ModelName:          logModel,
+		TokenName:          tokenName,
+		Quota:              quota,
+		Content:            logContent,
+		TokenId:            relayInfo.TokenId,
+		UseTimeSeconds:     int(useTimeSeconds),
+		IsStream:           relayInfo.IsStream,
+		Group:              relayInfo.UsingGroup,
+		Other:              other,
+		AudioTokens:        usage.PromptTokensDetails.AudioTokens + usage.CompletionTokenDetails.AudioTokens,
+		AudioInputTokens:   usage.PromptTokensDetails.AudioTokens,
+		AudioOutputTokens:  usage.CompletionTokenDetails.AudioTokens,
+		AudioOutputSeconds: usage.AudioOutputSeconds,
+		ImageCount:         usage.ImageCount,
+		VideoSeconds:       usage.VideoSeconds,
+		UsageAvailable:     ValidUsage(usage),
 	})
 	gopool.Go(func() {
 		perfmetrics.RecordRelaySample(relayInfo, true, int64(usage.CompletionTokens))

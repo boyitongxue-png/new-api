@@ -109,6 +109,9 @@ func OpenaiTTSHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 			usage.CompletionTokens = completionTokens
 			usage.CompletionTokenDetails.AudioTokens = completionTokens
 		}
+		if duration > 0 {
+			usage.AudioOutputSeconds = common.QuotaRound(math.Ceil(duration))
+		}
 		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 	}
 

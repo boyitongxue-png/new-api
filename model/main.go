@@ -410,6 +410,28 @@ func migrateClickHouseLogDB() error {
 	if err := LOG_DB.Exec(clickHouseLogCreateTableSQL(ttlDays)).Error; err != nil {
 		return err
 	}
+	for _, column := range []string{
+		"cached_tokens Int32 DEFAULT 0",
+		"cache_creation_tokens Int32 DEFAULT 0",
+		"image_tokens Int32 DEFAULT 0",
+		"audio_tokens Int32 DEFAULT 0",
+		"audio_input_tokens Int32 DEFAULT 0",
+		"audio_output_tokens Int32 DEFAULT 0",
+		"image_count Int32 DEFAULT 0",
+		"audio_seconds Int32 DEFAULT 0",
+		"audio_output_seconds Int32 DEFAULT 0",
+		"video_seconds Int32 DEFAULT 0",
+		"actual_cost_micros Int64 DEFAULT 0",
+		"revenue_micros Int64 DEFAULT 0",
+		"cost_currency String DEFAULT ''",
+		"cost_source String DEFAULT ''",
+		"usage_available UInt8 DEFAULT 0",
+		"billing_event String DEFAULT 'request'",
+	} {
+		if err := LOG_DB.Exec("ALTER TABLE logs ADD COLUMN IF NOT EXISTS " + column).Error; err != nil {
+			return err
+		}
+	}
 	return syncClickHouseLogTTL(ttlDays)
 }
 
@@ -458,7 +480,23 @@ CREATE TABLE IF NOT EXISTS logs (
 	ip String DEFAULT '',
 	request_id String DEFAULT '',
 	upstream_request_id String DEFAULT '',
-	other String DEFAULT ''
+	other String DEFAULT '',
+	cached_tokens Int32 DEFAULT 0,
+	cache_creation_tokens Int32 DEFAULT 0,
+	image_tokens Int32 DEFAULT 0,
+	audio_tokens Int32 DEFAULT 0,
+	audio_input_tokens Int32 DEFAULT 0,
+	audio_output_tokens Int32 DEFAULT 0,
+	image_count Int32 DEFAULT 0,
+	audio_seconds Int32 DEFAULT 0,
+	audio_output_seconds Int32 DEFAULT 0,
+	video_seconds Int32 DEFAULT 0,
+	actual_cost_micros Int64 DEFAULT 0,
+	revenue_micros Int64 DEFAULT 0,
+	cost_currency String DEFAULT '',
+	cost_source String DEFAULT '',
+	usage_available UInt8 DEFAULT 0,
+	billing_event String DEFAULT 'request'
 )
 ENGINE = MergeTree()
 PARTITION BY toYYYYMM(toDateTime(created_at))

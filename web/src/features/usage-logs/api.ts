@@ -24,6 +24,9 @@ import type {
   GetLogsResponse,
   GetLogStatsParams,
   GetLogStatsResponse,
+  CostStatisticsResponse,
+  CostStatisticsLogsParams,
+  CostStatisticsLogsResponse,
   GetMidjourneyLogsParams,
   GetTaskLogsParams,
   UserInfo,
@@ -110,3 +113,33 @@ export const getAllTaskLogs = (params: GetTaskLogsParams) =>
 
 export const getUserTaskLogs = (params: GetTaskLogsParams) =>
   fetchLogs('/api/task', params, false)
+
+export async function getCostStatistics(
+  params: Record<string, string | number | undefined>
+) {
+  const query = buildQueryParams(params)
+  const res = await api.get<CostStatisticsResponse>(
+    `/api/cost-statistics?${query}`
+  )
+  return res.data
+}
+
+export async function getCostStatisticsLogs(
+  params: CostStatisticsLogsParams
+): Promise<CostStatisticsLogsResponse> {
+  const query = buildQueryParams(params as unknown as Record<string, unknown>)
+  const res = await api.get<CostStatisticsLogsResponse>(
+    `/api/cost-statistics/logs?${query}`
+  )
+  return res.data
+}
+
+export async function exportCostStatistics(
+  params: Record<string, string | number | undefined>
+): Promise<Blob> {
+  const query = buildQueryParams(params)
+  const res = await api.get(`/api/cost-statistics/export?${query}`, {
+    responseType: 'blob',
+  })
+  return res.data as Blob
+}

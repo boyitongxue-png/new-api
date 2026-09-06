@@ -975,6 +975,7 @@ type TaskInfo struct {
 	TerminalError    bool   `json:"-"`
 	CompletionTokens int    `json:"completion_tokens,omitempty"` // 用于按倍率计费
 	TotalTokens      int    `json:"total_tokens,omitempty"`      // 用于按倍率计费
+	UsageFacts       map[string]any `json:"usage_facts,omitempty"`
 }
 
 func FailTaskInfo(reason string) *TaskInfo {

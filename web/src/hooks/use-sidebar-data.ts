@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import {
   Activity,
   Box,
+  CircleDollarSign,
   CreditCard,
   FileText,
   FlaskConical,
@@ -133,6 +134,11 @@ export function useSidebarData(): SidebarData {
             title: t('Models'),
             url: '/models/metadata',
             icon: Box,
+          },
+          {
+            title: t('Cost & Profit'),
+            url: '/cost-statistics',
+            icon: CircleDollarSign,
           },
           {
             title: t('Users'),

@@ -58,6 +58,7 @@ const DEFAULT_SIDEBAR_MODULES: SidebarModulesAdminConfig = {
   admin: {
     enabled: true,
     channel: true,
+    cost: true,
     models: true,
     redemption: true,
     user: true,
@@ -106,6 +107,10 @@ const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/usage-logs/error': { section: 'console', module: 'log' },
   '/usage-logs/drawing': { section: 'console', module: 'midjourney' },
   '/usage-logs/task': { section: 'console', module: 'task' },
+  '/cost-statistics': { section: 'admin', module: 'cost' },
+  // Preserve configuration behavior for existing bookmarks while the route
+  // redirects them to the administrator report.
+  '/usage-logs/profit': { section: 'admin', module: 'cost' },
   '/wallet': { section: 'personal', module: 'topup' },
   '/profile': { section: 'personal', module: 'personal' },
   '/channels': { section: 'admin', module: 'channel' },

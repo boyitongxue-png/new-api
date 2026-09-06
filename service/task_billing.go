@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -122,6 +123,137 @@ func taskAdjustTokenQuota(ctx context.Context, task *model.Task, delta int) {
 	}
 }
 
+func taskUsageNumber(value interface{}) (float64, bool) {
+	switch number := value.(type) {
+	case float64:
+		return number, true
+	case float32:
+		return float64(number), true
+	case int:
+		return float64(number), true
+	case int64:
+		return float64(number), true
+	case uint:
+		return float64(number), true
+	case uint64:
+		return float64(number), true
+	default:
+		return 0, false
+	}
+}
+
+func normalizeTaskUsageKey(key string) string {
+	return strings.NewReplacer("_", "", "-", "").Replace(strings.ToLower(strings.TrimSpace(key)))
+}
+
+func readTaskUsageFact(facts map[string]interface{}, aliases []string, limit int) (int64, bool, bool) {
+	wanted := make(map[string]struct{}, len(aliases))
+	for _, alias := range aliases {
+		wanted[normalizeTaskUsageKey(alias)] = struct{}{}
+	}
+	for key, raw := range facts {
+		if _, ok := wanted[normalizeTaskUsageKey(key)]; !ok {
+			continue
+		}
+		number, ok := taskUsageNumber(raw)
+		if !ok || math.IsNaN(number) || math.IsInf(number, 0) || number < 0 {
+			return 0, true, true
+		}
+		if number > float64(limit) {
+			common.SysError(fmt.Sprintf("async task usage fact %q exceeds limit %d", key, limit))
+			return int64(limit), true, true
+		}
+		value, clamp := common.QuotaRoundChecked(number)
+		if clamp != nil || value < 0 {
+			return 0, true, true
+		}
+		return int64(value), true, false
+	}
+	return 0, false, false
+}
+
+func taskCostUsageFromResult(result *relaycommon.TaskInfo) (model.CostUsage, []string) {
+	usage := model.CostUsage{IncludeRequestFee: false}
+	if result == nil {
+		return usage, nil
+	}
+	rejected := make([]string, 0)
+	read := func(aliases ...string) int64 {
+		value, present, invalid := readTaskUsageFact(result.UsageFacts, aliases, common.MaxQuota)
+		if invalid {
+			rejected = append(rejected, aliases[0])
+		}
+		if !present || invalid {
+			return 0
+		}
+		usage.UsageAvailable = true
+		return value
+	}
+	usage.PromptTokens = read("prompt_tokens", "promptTokens", "input_tokens", "inputTokens")
+	usage.CompletionTokens = read("completion_tokens", "completionTokens", "output_tokens", "outputTokens")
+	totalTokens := read("total_tokens", "totalTokens")
+	if usage.CompletionTokens == 0 && result.CompletionTokens > 0 {
+		usage.CompletionTokens = int64(result.CompletionTokens)
+		usage.UsageAvailable = true
+	}
+	if totalTokens == 0 && result.TotalTokens > 0 {
+		totalTokens = int64(result.TotalTokens)
+		usage.UsageAvailable = true
+	}
+	if usage.PromptTokens == 0 && usage.CompletionTokens == 0 && totalTokens > 0 {
+		usage.CompletionTokens = totalTokens
+	} else if usage.PromptTokens == 0 && totalTokens >= usage.CompletionTokens {
+		usage.PromptTokens = totalTokens - usage.CompletionTokens
+	}
+	usage.CachedTokens = read("cached_tokens", "cachedTokens", "cache_read_tokens", "cacheReadTokens")
+	usage.CacheCreationTokens = read("cache_creation_tokens", "cacheCreationTokens", "cache_write_tokens", "cacheWriteTokens")
+	usage.ImageTokens = read("image_tokens", "imageTokens")
+	usage.AudioInputTokens = read("audio_input_tokens", "audioInputTokens")
+	usage.AudioOutputTokens = read("audio_output_tokens", "audioOutputTokens")
+	usage.ImageCount = read("image_count", "imageCount", "images", "count")
+	readDuration := func(aliases ...string) int64 {
+		value, present, invalid := readTaskUsageFact(result.UsageFacts, aliases, relaycommon.MaxTaskDurationSeconds)
+		if invalid {
+			rejected = append(rejected, aliases[0])
+		}
+		if !present || invalid {
+			return 0
+		}
+		usage.UsageAvailable = true
+		return value
+	}
+	usage.VideoSeconds = readDuration("video_seconds", "videoSeconds", "video_duration", "videoDuration", "video")
+	usage.AudioSeconds = readDuration("audio_seconds", "audioSeconds", "audio_duration", "audioDuration", "audio", "audio_input_seconds", "audioInputSeconds")
+	usage.AudioOutputSeconds = readDuration("audio_output_seconds", "audioOutputSeconds", "audio_output_duration", "audioOutputDuration")
+	if usage.VideoSeconds == 0 {
+		usage.VideoSeconds = readDuration("seconds", "duration")
+	}
+	return usage, rejected
+}
+
+func taskBillingOtherWithCostUsage(task *model.Task, usage model.CostUsage, event string, rejected []string) map[string]interface{} {
+	other := taskBillingOther(task)
+	other["cost_usage"] = map[string]interface{}{
+		"usage_available": usage.UsageAvailable,
+		"prompt_tokens": usage.PromptTokens,
+		"completion_tokens": usage.CompletionTokens,
+		"cached_tokens": usage.CachedTokens,
+		"cache_creation_tokens": usage.CacheCreationTokens,
+		"image_tokens": usage.ImageTokens,
+		"audio_input_tokens": usage.AudioInputTokens,
+		"audio_output_tokens": usage.AudioOutputTokens,
+		"image_count": usage.ImageCount,
+		"audio_seconds": usage.AudioSeconds,
+		"audio_output_seconds": usage.AudioOutputSeconds,
+		"video_seconds": usage.VideoSeconds,
+	}
+	other["cost_usage_event"] = event
+	if len(rejected) > 0 {
+		other["cost_usage_rejected"] = rejected
+	}
+	return other
+}
+
 // taskBillingOther 从 task 的 BillingContext 构建日志 Other 字段。
 func taskBillingOther(task *model.Task) map[string]interface{} {
 	other := make(map[string]interface{})
@@ -213,7 +345,11 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool 
 // reason 用于日志记录（例如 "token重算" 或 "adaptor调整"）。
 // clamps 可选：若计算 actualQuota 时发生额度饱和，将其记入日志 admin_info（仅管理员可见）。
 func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int, reason string, clamps ...*common.QuotaClamp) {
-	if actualQuota <= 0 {
+	recalculateTaskQuotaWithUsage(ctx, task, actualQuota, reason, model.CostUsage{}, nil, clamps...)
+}
+
+func recalculateTaskQuotaWithUsage(ctx context.Context, task *model.Task, actualQuota int, reason string, usage model.CostUsage, rejected []string, clamps ...*common.QuotaClamp) {
+	if actualQuota <= 0 || task == nil {
 		return
 	}
 	preConsumedQuota := task.Quota
@@ -222,6 +358,13 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	if quotaDelta == 0 {
 		logger.LogInfo(ctx, fmt.Sprintf("任务 %s 预扣费准确（%s，%s）",
 			task.TaskID, logger.LogQuota(actualQuota), reason))
+		if usage.UsageAvailable || len(rejected) > 0 {
+			other := taskBillingOtherWithCostUsage(task, usage, "settlement", rejected)
+			other["task_id"] = task.TaskID
+			other["pre_consumed_quota"] = preConsumedQuota
+			other["actual_quota"] = actualQuota
+			model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{UserId: task.UserId, LogType: model.LogTypeConsume, Content: reason, ChannelId: task.ChannelId, ModelName: taskModelName(task), TokenId: task.PrivateData.TokenId, Group: task.Group, Other: other, CostUsage: &usage})
+		}
 		return
 	}
 
@@ -258,7 +401,11 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 		logType = model.LogTypeRefund
 		logQuota = -quotaDelta
 	}
-	other := taskBillingOther(task)
+	if quotaDelta < 0 {
+		usage = model.CostUsage{}
+		rejected = nil
+	}
+	other := taskBillingOtherWithCostUsage(task, usage, map[bool]string{true: "settlement", false: "refund"}[quotaDelta > 0], rejected)
 	other["task_id"] = task.TaskID
 	other["pre_consumed_quota"] = preConsumedQuota
 	other["actual_quota"] = actualQuota
@@ -276,6 +423,7 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 		Group:     task.Group,
 		Other:     other,
 		NodeName:  task.PrivateData.NodeName,
+		CostUsage: func() *model.CostUsage { if logType == model.LogTypeConsume { return &usage }; return nil }(),
 	})
 }
 
@@ -331,8 +479,9 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 	}
 
 	// 计算实际应扣费额度: totalTokens * modelRatio * groupRatio * otherMultiplier（饱和转换，防止溢出成负数）
-	actualQuota, clamp := common.QuotaFromFloatChecked(float64(totalTokens) * modelRatio * finalGroupRatio * otherMultiplier)
+	actualQuota, clamp := common.QuotaFromFloatChecked(float64(totalTokens) * modelRatio * finalGroupRatio * otherMultiplier * common.QuotaPerUnit)
 
 	reason := fmt.Sprintf("token重算：tokens=%d, modelRatio=%.2f, groupRatio=%.2f, otherMultiplier=%.4f", totalTokens, modelRatio, finalGroupRatio, otherMultiplier)
-	RecalculateTaskQuota(ctx, task, actualQuota, reason, clamp)
+	usage := model.CostUsage{UsageAvailable: true, CompletionTokens: int64(totalTokens)}
+	recalculateTaskQuotaWithUsage(ctx, task, actualQuota, reason, usage, nil, clamp)
 }

@@ -241,6 +241,13 @@ type Usage struct {
 
 	// OpenRouter Params
 	Cost any `json:"cost,omitempty"`
+
+	// Internal usage dimensions used for cost accounting; they are not part of
+	// the public upstream response contract.
+	ImageCount         int `json:"-"`
+	AudioSeconds       int `json:"-"`
+	AudioOutputSeconds int `json:"-"`
+	VideoSeconds       int `json:"-"`
 }
 
 type OpenAIVideoResponse struct {
