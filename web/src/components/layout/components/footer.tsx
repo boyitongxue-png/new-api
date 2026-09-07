@@ -128,21 +128,24 @@ function ProjectAttribution(props: {
   currentYear: number
   inline?: boolean
   brandName?: string
+  href?: string
+  showSuffix?: boolean
 }) {
   const { t } = useTranslation()
   const brandName = props.brandName ?? t('New API')
+  const showSuffix = props.showSuffix ?? true
   const content = (
     <span className='text-muted-foreground/45'>
       &copy; {props.currentYear}{' '}
       <a
-        href='https://github.com/QuantumNous/new-api'
+        href={props.href ?? 'https://github.com/QuantumNous/new-api'}
         target='_blank'
         rel='noopener noreferrer'
         className='text-foreground/70 hover:text-foreground font-medium transition-colors'
       >
         {brandName}
       </a>
-      . {t(NEW_API_FOOTER_ATTRIBUTION_KEY)}
+      {showSuffix && `. ${t(NEW_API_FOOTER_ATTRIBUTION_KEY)}`}
     </span>
   )
   if (props.inline) {
@@ -248,7 +251,12 @@ export function Footer(props: FooterProps) {
                 API MIX
               </span>
             </Link>
-            <ProjectAttribution currentYear={currentYear} brandName='API MIX' />
+            <ProjectAttribution
+              currentYear={currentYear}
+              brandName='API MIX'
+              href='https://api.lmzh.cc'
+              showSuffix={false}
+            />
           </div>
         </div>
       </footer>
