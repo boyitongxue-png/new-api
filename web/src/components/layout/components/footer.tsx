@@ -124,8 +124,13 @@ function LegalLinks(props: { leadingSeparator?: boolean }) {
 
 // inline=true returns just the inner span for composition in a parent flex
 // row. inline=false wraps in a centered/right-aligned div (default).
-function ProjectAttribution(props: { currentYear: number; inline?: boolean }) {
+function ProjectAttribution(props: {
+  currentYear: number
+  inline?: boolean
+  brandName?: string
+}) {
   const { t } = useTranslation()
+  const brandName = props.brandName ?? t('New API')
   const content = (
     <span className='text-muted-foreground/45'>
       &copy; {props.currentYear}{' '}
@@ -135,7 +140,7 @@ function ProjectAttribution(props: { currentYear: number; inline?: boolean }) {
         rel='noopener noreferrer'
         className='text-foreground/70 hover:text-foreground font-medium transition-colors'
       >
-        {t('New API')}
+        {brandName}
       </a>
       . {t(NEW_API_FOOTER_ATTRIBUTION_KEY)}
     </span>
@@ -243,7 +248,7 @@ export function Footer(props: FooterProps) {
                 API MIX
               </span>
             </Link>
-            <ProjectAttribution currentYear={currentYear} />
+            <ProjectAttribution currentYear={currentYear} brandName='API MIX' />
           </div>
         </div>
       </footer>
