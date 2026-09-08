@@ -90,6 +90,7 @@ import type { Model } from '../../types'
 const extendedModelFormSchema = z.object({
   id: z.number().optional(),
   model_name: z.string().min(1, 'Model name is required'),
+  model_type: z.enum(['text', 'audio', 'image', 'video', 'other']),
   description: z.string(),
   icon: z.string(),
   tags: z.array(z.string()),
@@ -304,6 +305,7 @@ export function ModelMutateDrawer({
       'claude.thinking_adapter_enabled': true,
       'claude.thinking_adapter_budget_tokens_percentage': 0.8,
       ModelPrice: '',
+      ModelCost: '{}',
       ModelRatio: '',
       CacheRatio: '',
       CompletionRatio: '',
@@ -364,6 +366,7 @@ export function ModelMutateDrawer({
     resolver: zodResolver(extendedModelFormSchema),
     defaultValues: {
       model_name: '',
+      model_type: 'text',
       description: '',
       icon: '',
       tags: [],
@@ -428,6 +431,7 @@ export function ModelMutateDrawer({
       setPricingMode(pricing.mode)
       setPromptPrice(pricing.promptPrice)
       setCompletionPrice(pricing.completionPrice)
+      form.setValue('model_type', model.model_type || 'text')
       setAdvancedOpen(pricing.advancedOpen)
       form.reset({
         id: model.id,
@@ -791,6 +795,46 @@ export function ModelMutateDrawer({
                         {...field}
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='model_type'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Model Type')}</FormLabel>
+                    <Select
+                      items={[
+                        { value: 'text', label: t('Text') },
+                        { value: 'audio', label: t('Audio') },
+                        { value: 'image', label: t('Image') },
+                        { value: 'video', label: t('Video') },
+                        { value: 'other', label: t('Other') },
+                      ]}
+                      value={field.value}
+                      onValueChange={(value) => value && field.onChange(value)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent alignItemWithTrigger={false}>
+                        {['text', 'audio', 'image', 'video', 'other'].map(
+                          (value) => (
+                            <SelectItem key={value} value={value}>
+                              {t(value[0].toUpperCase() + value.slice(1))}
+                            </SelectItem>
+                          )
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      {t('Used to select the appropriate billing dimensions.')}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

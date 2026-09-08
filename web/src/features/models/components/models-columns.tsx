@@ -136,6 +136,27 @@ export function useModelsColumns(vendors: Vendor[] = []): ColumnDef<Model>[] {
       minSize: 200,
     },
 
+    {
+      accessorKey: 'model_type',
+      header: t('Model Type'),
+      cell: ({ row }) => {
+        const labels: Record<string, string> = {
+          text: t('Text'),
+          audio: t('Audio'),
+          image: t('Image'),
+          video: t('Video'),
+          other: t('Other'),
+        }
+        return (
+          <StatusBadge variant='info' size='sm'>
+            {labels[row.original.model_type || 'text'] || t('Text')}
+          </StatusBadge>
+        )
+      },
+      size: 100,
+      enableSorting: false,
+    },
+
     // Name Rule column
     {
       accessorKey: 'name_rule',

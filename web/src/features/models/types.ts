@@ -36,6 +36,7 @@ export interface BoundChannel {
 export interface Model {
   id: number
   model_name: string
+  model_type?: 'text' | 'audio' | 'image' | 'video' | 'other'
   description?: string
   icon?: string
   tags?: string
@@ -230,6 +231,9 @@ export interface PrefillGroupsResponse {
 export const modelFormSchema = z.object({
   id: z.number().optional(),
   model_name: z.string().min(1, 'Model name is required'),
+  model_type: z
+    .enum(['text', 'audio', 'image', 'video', 'other'])
+    .default('text'),
   description: z.string().default(''),
   icon: z.string().default(''),
   tags: z.array(z.string()).default([]),
