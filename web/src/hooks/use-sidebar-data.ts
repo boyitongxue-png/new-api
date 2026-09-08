@@ -132,13 +132,19 @@ export function useSidebarData(): SidebarData {
           },
           {
             title: t('Models'),
-            url: '/models/metadata',
             icon: Box,
-          },
-          {
-            title: t('Cost & Profit'),
-            url: '/cost-statistics',
-            icon: CircleDollarSign,
+            items: [
+              { title: t('Models Directory'), url: '/models/metadata' },
+              {
+                title: t('Upstream Model Costs'),
+                url: '/system-settings/models/model-costs',
+              },
+              {
+                title: t('Cost & Profit'),
+                url: '/cost-statistics',
+                icon: CircleDollarSign,
+              },
+            ],
           },
           {
             title: t('Users'),

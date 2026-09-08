@@ -107,7 +107,7 @@ const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/usage-logs/error': { section: 'console', module: 'log' },
   '/usage-logs/drawing': { section: 'console', module: 'midjourney' },
   '/usage-logs/task': { section: 'console', module: 'task' },
-  '/cost-statistics': { section: 'admin', module: 'cost' },
+  '/cost-statistics': { section: 'admin', module: 'models' },
   // Preserve configuration behavior for existing bookmarks while the route
   // redirects them to the administrator report.
   '/usage-logs/profit': { section: 'admin', module: 'cost' },
@@ -117,6 +117,7 @@ const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/models': { section: 'admin', module: 'models' },
   '/models/metadata': { section: 'admin', module: 'models' },
   '/models/deployments': { section: 'admin', module: 'models' },
+  '/system-settings/models/model-costs': { section: 'admin', module: 'models' },
   '/users': { section: 'admin', module: 'user' },
   '/redemption-codes': { section: 'admin', module: 'redemption' },
   '/subscriptions': { section: 'admin', module: 'subscription' },
