@@ -24,7 +24,6 @@ import { ClaudeSettingsCard } from './claude-settings-card'
 import { GeminiSettingsCard } from './gemini-settings-card'
 import { GlobalSettingsCard } from './global-settings-card'
 import { GrokSettingsCard } from './grok-settings-card'
-import { ModelCostSection } from './model-cost-section'
 import { RoutingReliabilitySection } from './routing-reliability-section'
 
 function formatJsonForEditor(value: string, fallback: string) {
@@ -178,14 +177,6 @@ const MODELS_SECTIONS = [
           apiKey: settings['model_deployment.ionet.api_key'],
         }}
       />
-    ),
-  },
-  {
-    id: 'model-costs',
-    titleKey: 'Upstream Model Costs',
-    showInNav: false,
-    build: (settings: ModelSettings) => (
-      <ModelCostSection defaultValue={settings.ModelCost} />
     ),
   },
 ] as const

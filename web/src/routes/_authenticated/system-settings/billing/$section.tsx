@@ -30,8 +30,8 @@ export const Route = createFileRoute(
   beforeLoad: ({ params }) => {
     if (params.section === 'model-costs') {
       throw redirect({
-        to: '/system-settings/models/$section',
-        params: { section: 'model-costs' },
+        to: '/models/$section',
+        params: { section: 'costs' },
       })
     }
 

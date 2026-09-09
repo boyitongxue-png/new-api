@@ -19,12 +19,14 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQueryClient } from '@tanstack/react-query'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useSystemOptions } from '@/features/system-settings/hooks/use-system-options'
+import { ModelCostSection } from '@/features/system-settings/models/model-cost-section'
 
 import { listDeployments } from './api'
 import { DeploymentAccessGuard } from './components/deployment-access-guard'
@@ -50,6 +52,9 @@ const SECTION_META: Record<ModelsSectionId, { titleKey: string }> = {
   },
   deployments: {
     titleKey: 'Deployments',
+  },
+  costs: {
+    titleKey: 'Upstream Model Costs',
   },
 }
 
@@ -82,21 +87,32 @@ function ModelsContent() {
   )
 
   const meta = SECTION_META[activeSection] ?? SECTION_META.metadata
+  let actions: ReactNode = null
+  if (activeSection === 'metadata') {
+    actions = <ModelsPrimaryButtons />
+  } else if (activeSection === 'deployments') {
+    actions = (
+      <Button onClick={() => setCreateDeploymentOpen(true)} size='sm'>
+        <Plus className='h-4 w-4' />
+        {t('Create deployment')}
+      </Button>
+    )
+  }
+
+  let sectionContent: ReactNode
+  if (activeSection === 'metadata') {
+    sectionContent = <ModelsTable />
+  } else if (activeSection === 'deployments') {
+    sectionContent = <DeploymentsSection />
+  } else {
+    sectionContent = <ModelCostsSection />
+  }
 
   return (
     <>
       <SectionPageLayout fixedContent>
         <SectionPageLayout.Title>{t(meta.titleKey)}</SectionPageLayout.Title>
-        <SectionPageLayout.Actions>
-          {activeSection === 'metadata' ? (
-            <ModelsPrimaryButtons />
-          ) : (
-            <Button onClick={() => setCreateDeploymentOpen(true)} size='sm'>
-              <Plus className='h-4 w-4' />
-              {t('Create deployment')}
-            </Button>
-          )}
-        </SectionPageLayout.Actions>
+        <SectionPageLayout.Actions>{actions}</SectionPageLayout.Actions>
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>
             <Tabs value={activeSection} onValueChange={handleSectionChange}>
@@ -108,13 +124,7 @@ function ModelsContent() {
                 ))}
               </TabsList>
             </Tabs>
-            <div className='min-h-0 flex-1'>
-              {activeSection === 'metadata' ? (
-                <ModelsTable />
-              ) : (
-                <DeploymentsSection />
-              )}
-            </div>
+            <div className='min-h-0 flex-1'>{sectionContent}</div>
           </div>
         </SectionPageLayout.Content>
       </SectionPageLayout>
@@ -126,6 +136,23 @@ function ModelsContent() {
       />
     </>
   )
+}
+
+function ModelCostsSection() {
+  const { t } = useTranslation()
+  const { data, isLoading } = useSystemOptions()
+  const defaultValue =
+    data?.data?.find((option) => option.key === 'ModelCost')?.value ?? '{}'
+
+  if (isLoading) {
+    return (
+      <div className='text-muted-foreground flex min-h-40 items-center justify-center text-sm'>
+        {t('Loading settings...')}
+      </div>
+    )
+  }
+
+  return <ModelCostSection defaultValue={defaultValue} />
 }
 
 function DeploymentsSection() {
