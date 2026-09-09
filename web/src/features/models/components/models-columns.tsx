@@ -31,6 +31,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  getModeLabel,
+  getModeVariant,
+  getPriceSummary,
+  type ModelPricingSnapshot,
+} from '@/features/system-settings/models/model-pricing-snapshots'
 import { formatTimestampToDate } from '@/lib/format'
 import { getLobeIcon } from '@/lib/lobe-icon'
 
@@ -40,6 +46,7 @@ import {
   getQuotaTypeConfig,
 } from '../constants'
 import { parseModelTags, formatEndpointsDisplay } from '../lib'
+import type { ModelCostEntry } from '../lib/model-commercial'
 import type { Model, Vendor } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
 import { DescriptionCell } from './description-cell'
@@ -53,7 +60,11 @@ function getCompactModelIcon(iconKey: string) {
 /**
  * Generate models columns configuration
  */
-export function useModelsColumns(vendors: Vendor[] = []): ColumnDef<Model>[] {
+export function useModelsColumns(
+  vendors: Vendor[] = [],
+  pricingByModel: Record<string, ModelPricingSnapshot> = {},
+  costsByModel: Record<string, ModelCostEntry> = {}
+): ColumnDef<Model>[] {
   const { t } = useTranslation()
 
   // Get translated configs
@@ -154,6 +165,82 @@ export function useModelsColumns(vendors: Vendor[] = []): ColumnDef<Model>[] {
         )
       },
       size: 100,
+      enableSorting: false,
+    },
+
+    {
+      id: 'billing_mode',
+      header: t('Billing Mode'),
+      cell: ({ row }) => {
+        const pricing = pricingByModel[row.original.model_name]
+        return (
+          <StatusBadge
+            variant={getModeVariant(pricing?.billingMode)}
+            size='sm'
+            copyable={false}
+          >
+            {t(getModeLabel(pricing?.billingMode))}
+          </StatusBadge>
+        )
+      },
+      size: 120,
+      enableSorting: false,
+    },
+
+    {
+      id: 'upstream_cost',
+      header: t('Upstream Cost'),
+      cell: ({ row }) => {
+        const model = row.original
+        const cost = costsByModel[model.model_name]
+        if (!cost?.enabled) {
+          return (
+            <span className='text-muted-foreground text-xs'>
+              {t('Unset price')}
+            </span>
+          )
+        }
+
+        let summary = ''
+        if (model.model_type === 'video' && cost.video_per_second > 0) {
+          summary = `$${cost.video_per_second} / ${t('second')}`
+        } else if (model.model_type === 'image' && cost.image_per_unit > 0) {
+          summary = `$${cost.image_per_unit} / ${t('image')}`
+        } else if (
+          model.model_type === 'audio' &&
+          cost.audio_input_per_second > 0
+        ) {
+          summary = `$${cost.audio_input_per_second} / ${t('second')}`
+        } else if (cost.request_fee > 0) {
+          summary = `$${cost.request_fee} / ${t('request')}`
+        } else if (cost.input_per_1m > 0 || cost.output_per_1m > 0) {
+          summary = `$${cost.input_per_1m} / $${cost.output_per_1m} · 1M`
+        }
+
+        return summary ? (
+          <span className='font-mono text-xs whitespace-nowrap'>{summary}</span>
+        ) : (
+          <span className='text-muted-foreground text-xs'>
+            {t('Unset price')}
+          </span>
+        )
+      },
+      size: 160,
+      enableSorting: false,
+    },
+
+    {
+      id: 'sale_price',
+      header: t('Sale Price'),
+      cell: ({ row }) => {
+        const pricing = pricingByModel[row.original.model_name]
+        return (
+          <span className='text-xs whitespace-nowrap'>
+            {pricing ? getPriceSummary(pricing, t) : t('Unset price')}
+          </span>
+        )
+      },
+      size: 210,
       enableSorting: false,
     },
 

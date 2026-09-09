@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, Loader2 } from 'lucide-react'
+import { ChevronDown, CircleDollarSign, Loader2 } from 'lucide-react'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -85,6 +85,7 @@ import { createModel, updateModel, getModel, getVendors } from '../../api'
 import { getNameRuleOptions, ENDPOINT_TEMPLATES } from '../../constants'
 import { modelsQueryKeys, vendorsQueryKeys, parseModelTags } from '../../lib'
 import type { Model } from '../../types'
+import { useModels } from '../models-provider'
 
 // Extended schema for ratio configuration (internal form state only)
 const extendedModelFormSchema = z.object({
@@ -239,6 +240,7 @@ export function ModelMutateDrawer({
   currentRow,
 }: ModelMutateDrawerProps) {
   const { t } = useTranslation()
+  const { setOpen, setCurrentRow } = useModels()
   const queryClient = useQueryClient()
   const currentModelId = currentRow?.id
   const isEditing = Boolean(currentModelId)
@@ -520,7 +522,7 @@ export function ModelMutateDrawer({
 
           // Always process system settings updates if we have modelSettings
           // This ensures we can remove stale entries even when clearing all pricing fields
-          if (modelSettings) {
+          if (modelSettings && !isEditing) {
             // Read existing configurations
             const priceMap = safeJsonParse<Record<string, number>>(
               modelSettings.ModelPrice,
@@ -840,6 +842,21 @@ export function ModelMutateDrawer({
                 )}
               />
 
+              {isEditing && currentRow && (
+                <Button
+                  type='button'
+                  variant='outline'
+                  className='w-full justify-start'
+                  onClick={() => {
+                    setCurrentRow(currentRow)
+                    setOpen('model-commercial')
+                  }}
+                >
+                  <CircleDollarSign data-icon='inline-start' />
+                  {t('Pricing and cost')}
+                </Button>
+              )}
+
               <FormField
                 control={form.control}
                 name='icon'
@@ -1027,7 +1044,7 @@ export function ModelMutateDrawer({
             </SideDrawerSection>
 
             {/* Pricing Configuration */}
-            <SideDrawerSection>
+            {!isEditing && <SideDrawerSection>
               <h3 className='text-sm font-semibold'>
                 {t('Pricing Configuration')}
               </h3>
@@ -1367,7 +1384,7 @@ export function ModelMutateDrawer({
                   </Collapsible>
                 </>
               )}
-            </SideDrawerSection>
+            </SideDrawerSection>}
 
             {/* Status & Sync */}
             <SideDrawerSection>

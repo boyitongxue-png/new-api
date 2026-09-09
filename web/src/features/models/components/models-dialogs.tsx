@@ -22,6 +22,7 @@ import { PrefillGroupManagement } from './dialogs/prefill-group-management'
 import { SyncWizardDialog } from './dialogs/sync-wizard-dialog'
 import { UpstreamConflictDialog } from './dialogs/upstream-conflict-dialog'
 import { VendorMutateDialog } from './dialogs/vendor-mutate-dialog'
+import { ModelCommercialDrawer } from './drawers/model-commercial-drawer'
 import { ModelMutateDrawer } from './drawers/model-mutate-drawer'
 import { useModels } from './models-provider'
 
@@ -42,6 +43,12 @@ export function ModelsDialogs() {
         open={open === 'create-model' || open === 'update-model'}
         onOpenChange={(v) => !v && setOpen(null)}
         currentRow={currentRow}
+      />
+
+      <ModelCommercialDrawer
+        open={open === 'model-commercial'}
+        onOpenChange={(v) => !v && setOpen(null)}
+        model={currentRow}
       />
 
       {/* Vendor Create/Update Dialog */}

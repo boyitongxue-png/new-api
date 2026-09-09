@@ -22,6 +22,8 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { DataTablePage, useDataTable } from '@/components/data-table'
+import { useSystemOptions } from '@/features/system-settings/hooks/use-system-options'
+import { buildModelSnapshots } from '@/features/system-settings/models/model-pricing-snapshots'
 import { useMediaQuery } from '@/hooks'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
 
@@ -32,6 +34,7 @@ import {
   getSyncStatusOptions,
 } from '../constants'
 import { modelsQueryKeys, vendorsQueryKeys } from '../lib'
+import { getOptionMap, parseModelCostMap } from '../lib/model-commercial'
 import { DataTableBulkActions } from './data-table-bulk-actions'
 import { useModelsColumns } from './models-columns'
 import { useModels } from './models-provider'
@@ -81,6 +84,7 @@ export function ModelsTable() {
     queryKey: vendorsQueryKeys.list(),
     queryFn: () => getVendors({ page_size: 1000 }),
   })
+  const { data: systemOptionsData } = useSystemOptions()
 
   const vendors = useMemo(
     () => vendorsData?.data?.items || [],
@@ -151,8 +155,38 @@ export function ModelsTable() {
   const totalCount = data?.data?.total || 0
   const vendorCounts = data?.data?.vendor_counts
 
+  const optionMap = useMemo(
+    () => getOptionMap(systemOptionsData?.data),
+    [systemOptionsData?.data]
+  )
+  const pricingByModel = useMemo(() => {
+    const snapshots = buildModelSnapshots({
+      modelPrice: optionMap.ModelPrice || '{}',
+      modelRatio: optionMap.ModelRatio || '{}',
+      cacheRatio: optionMap.CacheRatio || '{}',
+      createCacheRatio: optionMap.CreateCacheRatio || '{}',
+      completionRatio: optionMap.CompletionRatio || '{}',
+      imageRatio: optionMap.ImageRatio || '{}',
+      audioRatio: optionMap.AudioRatio || '{}',
+      audioCompletionRatio: optionMap.AudioCompletionRatio || '{}',
+      billingMode: optionMap['billing_setting.billing_mode'] || '{}',
+      billingExpr: optionMap['billing_setting.billing_expr'] || '{}',
+      taskBillingPricing:
+        optionMap['billing_setting.task_billing_pricing'] || '{}',
+      scheduledDiscount:
+        optionMap['billing_setting.scheduled_discount'] || '{}',
+    })
+    return Object.fromEntries(
+      snapshots.map((snapshot) => [snapshot.name, snapshot])
+    )
+  }, [optionMap])
+  const costsByModel = useMemo(
+    () => parseModelCostMap(optionMap.ModelCost || '{}'),
+    [optionMap.ModelCost]
+  )
+
   // Columns configuration
-  const columns = useModelsColumns(vendors)
+  const columns = useModelsColumns(vendors, pricingByModel, costsByModel)
 
   // React Table instance
   const { table } = useDataTable({
@@ -160,9 +194,16 @@ export function ModelsTable() {
     columns,
     totalCount,
     initialColumnVisibility: {
+      name_rule: false,
+      vendor_id: false,
       description: false,
-      bound_channels: false,
+      tags: false,
+      endpoints: false,
+      enable_groups: false,
       quota_types: false,
+      sync_official: false,
+      created_time: false,
+      updated_time: false,
     },
     columnFilters,
     pagination,
