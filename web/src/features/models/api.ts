@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
 
+import type { ModelCostEntry } from './lib/model-commercial'
 import type {
   GetModelsParams,
   GetModelsResponse,
@@ -87,6 +88,18 @@ export async function updateModel(
   data: Partial<Model> & { id: number }
 ): Promise<{ success: boolean; message?: string; data?: Model }> {
   const res = await api.put('/api/models/', data)
+  return res.data
+}
+
+export async function updateModelCommercialConfig(
+  modelId: number,
+  data: {
+    channel_id: number
+    upstream_model: string
+    cost: ModelCostEntry
+  }
+): Promise<{ success: boolean; message?: string; data?: Model }> {
+  const res = await api.put(`/api/models/${modelId}/commercial-config`, data)
   return res.data
 }
 

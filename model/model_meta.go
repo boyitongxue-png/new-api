@@ -17,9 +17,10 @@ const (
 )
 
 type BoundChannel struct {
-	Id   int    `json:"id"`
-	Name string `json:"name"`
-	Type int    `json:"type"`
+	Id            int    `json:"id"`
+	Name          string `json:"name"`
+	Type          int    `json:"type"`
+	UpstreamModel string `json:"upstream_model"`
 }
 
 type Model struct {
@@ -117,14 +118,15 @@ func GetBoundChannelsByModelsMap(modelNames []string) (map[string][]BoundChannel
 		return result, nil
 	}
 	type row struct {
-		ID    int
-		Model string
-		Name  string
-		Type  int
+		ID           int
+		Model        string
+		Name         string
+		Type         int
+		ModelMapping *string
 	}
 	var rows []row
 	err := DB.Table("channels").
-		Select("channels.id as id, abilities.model as model, channels.name as name, channels.type as type").
+		Select("channels.id as id, abilities.model as model, channels.name as name, channels.type as type, channels.model_mapping as model_mapping").
 		Joins("JOIN abilities ON abilities.channel_id = channels.id").
 		Where("abilities.model IN ? AND abilities.enabled = ?", modelNames, true).
 		Distinct().
@@ -133,7 +135,18 @@ func GetBoundChannelsByModelsMap(modelNames []string) (map[string][]BoundChannel
 		return nil, err
 	}
 	for _, r := range rows {
-		result[r.Model] = append(result[r.Model], BoundChannel{Id: r.ID, Name: r.Name, Type: r.Type})
+		upstreamModel := r.Model
+		if r.ModelMapping != nil {
+			if mapped, _, mappingErr := common.ResolveModelMapping(*r.ModelMapping, r.Model); mappingErr == nil {
+				upstreamModel = mapped
+			}
+		}
+		result[r.Model] = append(result[r.Model], BoundChannel{
+			Id:            r.ID,
+			Name:          r.Name,
+			Type:          r.Type,
+			UpstreamModel: upstreamModel,
+		})
 	}
 	return result, nil
 }

@@ -127,6 +127,10 @@ func UpdateModelMeta(c *gin.Context) {
 		common.ApiErrorMsg(c, "缺少模型 ID")
 		return
 	}
+	if !statusOnly && strings.TrimSpace(m.ModelName) == "" {
+		common.ApiErrorMsg(c, "模型名称不能为空")
+		return
+	}
 
 	if statusOnly {
 		// 只更新状态，防止误清空其他字段
@@ -144,13 +148,47 @@ func UpdateModelMeta(c *gin.Context) {
 			return
 		}
 
-		if err := m.Update(); err != nil {
+		if err := m.UpdateWithConfigurationMigration(); err != nil {
 			common.ApiError(c, err)
 			return
 		}
 	}
 	model.RefreshPricing()
 	common.ApiSuccess(c, &m)
+}
+
+type modelCommercialConfigRequest struct {
+	ChannelID     int             `json:"channel_id"`
+	UpstreamModel string          `json:"upstream_model"`
+	Cost          model.ModelCost `json:"cost"`
+}
+
+// UpdateModelCommercialConfig saves one model or channel cost scope. Channel
+// scopes also maintain the downstream-to-upstream model mapping.
+func UpdateModelCommercialConfig(c *gin.Context) {
+	modelID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	var request modelCommercialConfigRequest
+	if err := common.DecodeJson(c.Request.Body, &request); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := model.SaveModelCommercialConfig(modelID, request.ChannelID, request.UpstreamModel, request.Cost); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	var updated model.Model
+	if err := model.DB.First(&updated, modelID).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	enrichModels([]*model.Model{&updated})
+	model.RefreshPricing()
+	common.ApiSuccess(c, &updated)
 }
 
 // DeleteModelMeta 删除模型

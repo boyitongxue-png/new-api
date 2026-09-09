@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -56,11 +57,14 @@ import {
 } from '@/features/system-settings/models/model-pricing-sheet'
 import { buildModelSnapshots } from '@/features/system-settings/models/model-pricing-snapshots'
 
+import { updateModelCommercialConfig } from '../../api'
+import { modelsQueryKeys } from '../../lib'
 import {
   buildPricingOptionUpdates,
   emptyModelCost,
   getOptionMap,
   parseModelCostMap,
+  resolveModelCostEntry,
   type ModelCostEntry,
 } from '../../lib/model-commercial'
 import type { Model } from '../../types'
@@ -119,6 +123,7 @@ export function ModelCommercialDrawer(props: ModelCommercialDrawerProps) {
   const [activeTab, setActiveTab] = useState('pricing')
   const [scopeKey, setScopeKey] = useState('')
   const [cost, setCost] = useState<ModelCostEntry>(emptyModelCost())
+  const [upstreamModel, setUpstreamModel] = useState('')
   const [isSavingPricing, setIsSavingPricing] = useState(false)
   const [isSavingCost, setIsSavingCost] = useState(false)
 
@@ -132,11 +137,17 @@ export function ModelCommercialDrawer(props: ModelCommercialDrawerProps) {
   )
   const modelName = props.model?.model_name || ''
   const modelType = props.model?.model_type || 'text'
+  const supportsChannelOverrides = props.model?.name_rule === 0
+  const selectedChannel = supportsChannelOverrides
+    ? (props.model?.bound_channels || []).find(
+        (channel) => `channel:${channel.id}:${modelName}` === scopeKey
+      )
+    : undefined
   const scopeOptions = useMemo(() => {
     if (!props.model) return []
     return [
       { value: props.model.model_name, label: t('Model default') },
-      ...(props.model.bound_channels || [])
+      ...(props.model.name_rule === 0 ? props.model.bound_channels || [] : [])
         .filter((channel) => channel.id !== undefined)
         .map((channel) => ({
           value: `channel:${channel.id}:${props.model?.model_name}`,
@@ -188,8 +199,24 @@ export function ModelCommercialDrawer(props: ModelCommercialDrawerProps) {
 
   useEffect(() => {
     if (!scopeKey) return
-    setCost(costMap[scopeKey] || emptyModelCost())
-  }, [costMap, scopeKey])
+    const channel = supportsChannelOverrides
+      ? (props.model?.bound_channels || []).find(
+          (item) => `channel:${item.id}:${modelName}` === scopeKey
+        )
+      : undefined
+    setCost(
+      costMap[scopeKey] ||
+        resolveModelCostEntry(costMap, modelName, channel?.id) ||
+        emptyModelCost()
+    )
+    setUpstreamModel(channel?.upstream_model || modelName)
+  }, [
+    costMap,
+    modelName,
+    props.model?.bound_channels,
+    scopeKey,
+    supportsChannelOverrides,
+  ])
 
   const savePricing = async () => {
     const data = await pricingRef.current?.commitDraft()
@@ -213,17 +240,20 @@ export function ModelCommercialDrawer(props: ModelCommercialDrawerProps) {
   }
 
   const saveCost = async () => {
-    if (!scopeKey) return
+    if (!scopeKey || !props.model) return
     setIsSavingCost(true)
     try {
-      const nextCostMap = { ...costMap, [scopeKey]: cost }
-      const response = await updateSystemOption({
-        key: 'ModelCost',
-        value: JSON.stringify(nextCostMap, null, 2),
+      const response = await updateModelCommercialConfig(props.model.id, {
+        channel_id: selectedChannel?.id || 0,
+        upstream_model: selectedChannel ? upstreamModel : '',
+        cost,
       })
       if (!response.success) throw new Error(response.message)
-      await queryClient.invalidateQueries({ queryKey: ['system-options'] })
-      toast.success(t('Model cost configuration saved'))
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['system-options'] }),
+        queryClient.invalidateQueries({ queryKey: modelsQueryKeys.all }),
+      ])
+      toast.success(t('Upstream settings saved'))
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : t('Failed to update setting')
@@ -276,11 +306,13 @@ export function ModelCommercialDrawer(props: ModelCommercialDrawerProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent alignItemWithTrigger={false}>
-                      {scopeOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
+                      <SelectGroup>
+                        {scopeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                   <FieldDescription>
@@ -299,6 +331,21 @@ export function ModelCommercialDrawer(props: ModelCommercialDrawerProps) {
                     onCheckedChange={(enabled) => setCost({ ...cost, enabled })}
                   />
                 </Field>
+                {selectedChannel && (
+                  <Field>
+                    <FieldLabel>{t('Upstream model')}</FieldLabel>
+                    <Input
+                      value={upstreamModel}
+                      maxLength={255}
+                      onChange={(event) => setUpstreamModel(event.target.value)}
+                    />
+                    <FieldDescription>
+                      {t(
+                        'Users call the model on the left. The platform forwards the request to the upstream model on the right.'
+                      )}
+                    </FieldDescription>
+                  </Field>
+                )}
                 <Field>
                   <FieldLabel>{t('Currency')}</FieldLabel>
                   <Input
@@ -338,7 +385,7 @@ export function ModelCommercialDrawer(props: ModelCommercialDrawerProps) {
               <div className='flex justify-end border-t pt-4'>
                 <Button onClick={saveCost} disabled={isSavingCost}>
                   <Save data-icon='inline-start' />
-                  {isSavingCost ? t('Saving...') : t('Save upstream cost')}
+                  {isSavingCost ? t('Saving...') : t('Save upstream settings')}
                 </Button>
               </div>
             </div>

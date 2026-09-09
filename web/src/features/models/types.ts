@@ -29,6 +29,7 @@ export interface BoundChannel {
   id?: number
   name: string
   type: number
+  upstream_model?: string
   status?: number
 }
 

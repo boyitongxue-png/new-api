@@ -61,18 +61,25 @@ func ValidateModelCostJSON(raw string) error {
 		if strings.TrimSpace(key) == "" {
 			return fmt.Errorf("ModelCost contains an empty model key")
 		}
-		currency := strings.TrimSpace(cost.Currency)
-		if currency == "" {
-			currency = "USD"
-		}
-		if len(currency) > maxModelCostCurrencyLength {
-			return fmt.Errorf("ModelCost.%s.currency must be at most %d characters", key, maxModelCostCurrencyLength)
-		}
-		if err := validateModelCostValues(key, cost); err != nil {
+		if _, err := validatedModelCost(key, cost); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func validatedModelCost(key string, cost ModelCost) (ModelCost, error) {
+	cost.Currency = strings.TrimSpace(cost.Currency)
+	if cost.Currency == "" {
+		cost.Currency = "USD"
+	}
+	if len(cost.Currency) > maxModelCostCurrencyLength {
+		return ModelCost{}, fmt.Errorf("ModelCost.%s.currency must be at most %d characters", key, maxModelCostCurrencyLength)
+	}
+	if err := validateModelCostValues(key, cost); err != nil {
+		return ModelCost{}, err
+	}
+	return cost, nil
 }
 
 func validateModelCostValues(key string, cost ModelCost) error {
@@ -98,19 +105,12 @@ func validateModelCostValues(key string, cost ModelCost) error {
 }
 
 func normalizeModelCost(key string, cost ModelCost) (ModelCost, bool) {
-	cost.Currency = strings.TrimSpace(cost.Currency)
-	if cost.Currency == "" {
-		cost.Currency = "USD"
-	}
-	if len(cost.Currency) > maxModelCostCurrencyLength {
-		common.SysError(fmt.Sprintf("invalid ModelCost.%s currency: exceeds %d characters", key, maxModelCostCurrencyLength))
-		return ModelCost{}, false
-	}
-	if err := validateModelCostValues(key, cost); err != nil {
+	normalized, err := validatedModelCost(key, cost)
+	if err != nil {
 		common.SysError(err.Error())
 		return ModelCost{}, false
 	}
-	return cost, true
+	return normalized, true
 }
 
 func resolveModelCost(modelName string, channelID int) (ModelCost, string) {
