@@ -46,7 +46,10 @@ import {
   getQuotaTypeConfig,
 } from '../constants'
 import { parseModelTags, formatEndpointsDisplay } from '../lib'
-import type { ModelCostEntry } from '../lib/model-commercial'
+import {
+  resolveModelCostEntry,
+  type ModelCostEntry,
+} from '../lib/model-commercial'
 import type { Model, Vendor } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
 import { DescriptionCell } from './description-cell'
@@ -192,8 +195,39 @@ export function useModelsColumns(
       header: t('Upstream Cost'),
       cell: ({ row }) => {
         const model = row.original
-        const cost = costsByModel[model.model_name]
-        if (!cost?.enabled) {
+        const channels = model.bound_channels || []
+        const costItems = (channels.length > 0 ? channels : [undefined]).map(
+          (channel) => ({
+            channel,
+            cost: resolveModelCostEntry(
+              costsByModel,
+              model.model_name,
+              channel?.id
+            ),
+          })
+        )
+
+        const formatCost = (cost: ModelCostEntry | undefined) => {
+          if (!cost) return t('Unset price')
+          if (model.model_type === 'video' && cost.video_per_second > 0) {
+            return `$${cost.video_per_second} / ${t('second')}`
+          }
+          if (model.model_type === 'image' && cost.image_per_unit > 0) {
+            return `$${cost.image_per_unit} / ${t('image')}`
+          }
+          if (model.model_type === 'audio' && cost.audio_input_per_second > 0) {
+            return `$${cost.audio_input_per_second} / ${t('second')}`
+          }
+          if (cost.request_fee > 0) {
+            return `$${cost.request_fee} / ${t('request')}`
+          }
+          if (cost.input_per_1m > 0 || cost.output_per_1m > 0) {
+            return `$${cost.input_per_1m} / $${cost.output_per_1m} · 1M`
+          }
+          return t('Unset price')
+        }
+
+        if (costItems.length === 0) {
           return (
             <span className='text-muted-foreground text-xs'>
               {t('Unset price')}
@@ -201,31 +235,29 @@ export function useModelsColumns(
           )
         }
 
-        let summary = ''
-        if (model.model_type === 'video' && cost.video_per_second > 0) {
-          summary = `$${cost.video_per_second} / ${t('second')}`
-        } else if (model.model_type === 'image' && cost.image_per_unit > 0) {
-          summary = `$${cost.image_per_unit} / ${t('image')}`
-        } else if (
-          model.model_type === 'audio' &&
-          cost.audio_input_per_second > 0
-        ) {
-          summary = `$${cost.audio_input_per_second} / ${t('second')}`
-        } else if (cost.request_fee > 0) {
-          summary = `$${cost.request_fee} / ${t('request')}`
-        } else if (cost.input_per_1m > 0 || cost.output_per_1m > 0) {
-          summary = `$${cost.input_per_1m} / $${cost.output_per_1m} · 1M`
-        }
-
-        return summary ? (
-          <span className='font-mono text-xs whitespace-nowrap'>{summary}</span>
-        ) : (
-          <span className='text-muted-foreground text-xs'>
-            {t('Unset price')}
-          </span>
+        return (
+          <div className='flex max-w-[240px] flex-col gap-0.5'>
+            {costItems.map(({ channel, cost }) => (
+              <div
+                key={
+                  channel ? `${channel.id}-${channel.name}` : model.model_name
+                }
+                className='flex min-w-0 items-center gap-1.5 text-xs'
+              >
+                {channel && (
+                  <span className='text-muted-foreground max-w-[110px] truncate'>
+                    {channel.name}
+                  </span>
+                )}
+                <span className='font-mono whitespace-nowrap'>
+                  {formatCost(cost)}
+                </span>
+              </div>
+            ))}
+          </div>
         )
       },
-      size: 160,
+      size: 220,
       enableSorting: false,
     },
 

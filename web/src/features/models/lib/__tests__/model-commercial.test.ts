@@ -18,7 +18,11 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, it } from 'vitest'
 
-import { buildPricingOptionUpdates } from '../model-commercial'
+import {
+  buildPricingOptionUpdates,
+  emptyModelCost,
+  resolveModelCostEntry,
+} from '../model-commercial'
 
 describe('model commercial pricing updates', () => {
   it('switches a token-priced model to per-second pricing without changing other models', () => {
@@ -55,5 +59,32 @@ describe('model commercial pricing updates', () => {
         resolution_prices: { '1080p': 0.12 },
       },
     })
+  })
+
+  it('resolves channel cost before model and default fallbacks', () => {
+    const modelCost = emptyModelCost()
+    modelCost.video_per_second = 0.8
+    const channelCost = emptyModelCost()
+    channelCost.video_per_second = 1.2
+    const fallbackCost = emptyModelCost()
+    fallbackCost.video_per_second = 0.5
+
+    expect(
+      resolveModelCostEntry(
+        {
+          default: fallbackCost,
+          video: modelCost,
+          'channel:7:video': channelCost,
+        },
+        'video',
+        7
+      )
+    ).toEqual(channelCost)
+    expect(resolveModelCostEntry({ video: modelCost }, 'video', 8)).toEqual(
+      modelCost
+    )
+    expect(
+      resolveModelCostEntry({ default: fallbackCost }, 'video', 8)
+    ).toEqual(fallbackCost)
   })
 })

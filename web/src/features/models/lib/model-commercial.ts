@@ -39,6 +39,23 @@ export type ModelCostEntry = {
 
 export type ModelCostMap = Record<string, ModelCostEntry>
 
+export function resolveModelCostEntry(
+  costs: ModelCostMap,
+  modelName: string,
+  channelId?: number
+): ModelCostEntry | undefined {
+  const keys = [
+    channelId !== undefined ? `channel:${channelId}:${modelName}` : '',
+    modelName,
+    'default',
+  ].filter(Boolean)
+  for (const key of keys) {
+    const cost = costs[key]
+    if (cost?.enabled) return cost
+  }
+  return undefined
+}
+
 export const emptyModelCost = (): ModelCostEntry => ({
   currency: 'USD',
   enabled: true,

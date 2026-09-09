@@ -320,7 +320,7 @@ func enrichModels(models []*model.Model) {
 		channelSet := make(map[string]model.BoundChannel)
 		for _, n := range names {
 			for _, ch := range matchedChannelsByModel[n] {
-				key := ch.Name + "_" + strconv.Itoa(ch.Type)
+				key := strconv.Itoa(ch.Id) + "_" + ch.Name + "_" + strconv.Itoa(ch.Type)
 				channelSet[key] = ch
 			}
 		}
