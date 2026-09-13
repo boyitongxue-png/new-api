@@ -106,7 +106,37 @@ func getChannelQuery(group string, model string, retry int) (*gorm.DB, error) {
 }
 
 func GetChannel(group string, model string, retry int, requestPath string) (*Channel, error) {
+	return GetChannelWithImageResolution(group, model, retry, requestPath, "")
+}
+
+func GetChannelWithImageResolution(group string, model string, retry int, requestPath string, resolution string) (*Channel, error) {
 	var abilities []Ability
+
+	// Cost-aware image routing must compare every eligible channel, regardless
+	// of legacy priority tiers. Retry then walks the cost-ordered candidates.
+	if resolution != "" {
+		err := DB.Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, model, true).
+			Order("weight DESC").Find(&abilities).Error
+		if err != nil {
+			return nil, err
+		}
+		abilities = filterAbilitiesByRequestPathAndModel(abilities, requestPath, model)
+		if len(abilities) > 0 {
+			channels := make([]*Channel, 0, len(abilities))
+			for _, ability := range abilities {
+				channel := &Channel{}
+				if err := DB.First(channel, "id = ?", ability.ChannelId).Error; err == nil {
+					channels = append(channels, channel)
+				}
+			}
+			if priced, ok := SelectLowestCostImageChannels(channels, resolution); ok {
+				if retry >= len(priced) {
+					retry = len(priced) - 1
+				}
+				return priced[retry], nil
+			}
+		}
+	}
 
 	var err error = nil
 	channelQuery, err := getChannelQuery(group, model, retry)

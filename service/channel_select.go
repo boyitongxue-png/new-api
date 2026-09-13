@@ -11,12 +11,13 @@ import (
 )
 
 type RetryParam struct {
-	Ctx          *gin.Context
-	TokenGroup   string
-	ModelName    string
-	RequestPath  string
-	Retry        *int
-	resetNextTry bool
+	Ctx             *gin.Context
+	TokenGroup      string
+	ModelName       string
+	RequestPath     string
+	Retry           *int
+	ImageResolution string
+	resetNextTry    bool
 }
 
 func (p *RetryParam) GetRetry() int {
@@ -115,7 +116,7 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			}
 			logger.LogDebug(param.Ctx, "Auto selecting group: %s, priorityRetry: %d", autoGroup, priorityRetry)
 
-			channel, _ = model.GetRandomSatisfiedChannel(autoGroup, param.ModelName, priorityRetry, param.RequestPath)
+			channel, _ = model.GetRandomSatisfiedChannelWithImageResolution(autoGroup, param.ModelName, priorityRetry, param.RequestPath, param.ImageResolution)
 			if channel == nil {
 				// Current group has no available channel for this model, try next group
 				// 当前分组没有该模型的可用渠道，尝试下一个分组
@@ -159,7 +160,7 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 		}
 		selectGroup = groups[0]
 		for _, group := range groups {
-			channel, err = model.GetRandomSatisfiedChannel(group, param.ModelName, param.GetRetry(), param.RequestPath)
+			channel, err = model.GetRandomSatisfiedChannelWithImageResolution(group, param.ModelName, param.GetRetry(), param.RequestPath, param.ImageResolution)
 			if err != nil {
 				return nil, group, err
 			}
