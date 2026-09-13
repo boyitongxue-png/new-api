@@ -153,6 +153,24 @@ func TestInsertKeepsBlankPasswordForPasswordlessUser(t *testing.T) {
 	assert.Empty(t, stored.Password)
 }
 
+func TestInsertHashesPasswordBeforeStoringUser(t *testing.T) {
+	setupUserUpdateTestState(t)
+
+	user := &User{
+		Username: "password-user",
+		Password: "Password123",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusEnabled,
+	}
+
+	require.NoError(t, user.Insert(0))
+
+	var stored User
+	require.NoError(t, DB.Where("username = ?", user.Username).First(&stored).Error)
+	assert.NotEqual(t, "Password123", stored.Password)
+	assert.True(t, common.ValidatePasswordAndHash("Password123", stored.Password))
+}
+
 func TestValidateAndFillRejectsPasswordlessUser(t *testing.T) {
 	setupUserUpdateTestState(t)
 

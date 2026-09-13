@@ -166,3 +166,41 @@ func TestCalculateCostAccountingSeparatesModalityTokens(t *testing.T) {
 	// modality tokens: 10 * 10 + 5 * 20 + 20 * 30 micro-USD.
 	assert.Equal(t, int64(960), accounting.ActualCostMicros)
 }
+
+func TestCalculateCostAccountingUsesVideoResolutionCost(t *testing.T) {
+	common.OptionMapRWMutex.Lock()
+	if common.OptionMap == nil {
+		common.OptionMap = make(map[string]string)
+	}
+	saved, hadSaved := common.OptionMap["ModelCost"]
+	common.OptionMapRWMutex.Unlock()
+	t.Cleanup(func() {
+		common.OptionMapRWMutex.Lock()
+		defer common.OptionMapRWMutex.Unlock()
+		if hadSaved {
+			common.OptionMap["ModelCost"] = saved
+		} else {
+			delete(common.OptionMap, "ModelCost")
+		}
+	})
+	common.OptionMapRWMutex.Lock()
+	common.OptionMap["ModelCost"] = `{"video-model":{"enabled":true,"video_per_second":0.01,"video_per_second_by_resolution":{"768p":0.15,"1080p":0.2,"1440p":0.3,"4k":0.35}}}`
+	common.OptionMapRWMutex.Unlock()
+
+	accounting := CalculateCostAccountingWithUsage("video-model", 0, 0, CostUsage{
+		UsageAvailable:  true,
+		VideoSeconds:    2,
+		VideoResolution: "2K",
+	})
+
+	if accounting.ActualCostMicros != 600000 {
+		t.Fatalf("resolution cost = %d, want %d", accounting.ActualCostMicros, int64(600000))
+	}
+}
+
+func TestValidateModelCostJSONRejectsInvalidVideoResolutionCost(t *testing.T) {
+	err := ValidateModelCostJSON(`{"video-model":{"enabled":true,"video_per_second_by_resolution":{"1080p":-1}}}`)
+	if err == nil {
+		t.Fatal("expected invalid resolution cost to be rejected")
+	}
+}

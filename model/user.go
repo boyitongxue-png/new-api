@@ -539,15 +539,7 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 
 func (user *User) prepareForInsert(tx *gorm.DB) error {
 	user.Email = NormalizeEmail(user.Email)
-	if err := ensureEmailAvailableWithTx(tx, user.Email, 0); err != nil {
-		return err
-	}
-	if user.Password == "" {
-		return nil
-	}
-	var err error
-	user.Password, err = common.Password2Hash(user.Password)
-	return err
+	return ensureEmailAvailableWithTx(tx, user.Email, 0)
 }
 
 // BindEmailToUser atomically checks email availability and assigns it to the
@@ -589,6 +581,14 @@ func ensureEmailAvailableWithTx(tx *gorm.DB, email string, excludeUserID int) er
 }
 
 func (user *User) Insert(inviterId int) error {
+	user.Email = NormalizeEmail(user.Email)
+	if user.Password != "" {
+		hashedPassword, err := common.Password2Hash(user.Password)
+		if err != nil {
+			return err
+		}
+		user.Password = hashedPassword
+	}
 	if err := DB.Transaction(func(tx *gorm.DB) error {
 		return withNormalizedEmailLock(tx, user.Email, func(tx *gorm.DB) error {
 			if err := user.prepareForInsert(tx); err != nil {
@@ -654,6 +654,13 @@ func (user *User) FinishInsert(inviterId int) {
 // This is used for OAuth registration where user creation and binding need to be atomic.
 // Post-creation tasks (sidebar config, logs, inviter rewards) are handled after the transaction commits.
 func (user *User) InsertWithTx(tx *gorm.DB, inviterId int) error {
+	if user.Password != "" {
+		hashedPassword, err := common.Password2Hash(user.Password)
+		if err != nil {
+			return err
+		}
+		user.Password = hashedPassword
+	}
 	return withNormalizedEmailLock(tx, user.Email, func(tx *gorm.DB) error {
 		if err := user.prepareForInsert(tx); err != nil {
 			return err

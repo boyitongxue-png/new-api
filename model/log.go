@@ -399,6 +399,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		AudioOutputSeconds:  int64(params.AudioOutputSeconds),
 		ImageCount:          int64(params.ImageCount),
 		VideoSeconds:        int64(params.VideoSeconds),
+		VideoResolution:     logVideoResolution(params.Other),
 		IncludeRequestFee:   true,
 	})
 	if params.Other == nil {
@@ -549,6 +550,7 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 	usage := CostUsage{}
 	if params.CostUsage != nil && params.LogType != LogTypeRefund {
 		usage = *params.CostUsage
+		usage.VideoResolution = logVideoResolution(params.Other)
 	} else if params.CostUsage == nil && params.LogType != LogTypeRefund {
 		// Legacy task logs represent a completed billable request but have no
 		// measured dimensions. Preserve the configured per-request fee without
@@ -625,6 +627,18 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 			NodeName:  nodeName,
 		})
 	}
+}
+
+func logVideoResolution(other map[string]interface{}) string {
+	if other == nil {
+		return ""
+	}
+	for _, key := range []string{"resolution", "video_resolution", "billing_resolution"} {
+		if value, ok := other[key].(string); ok {
+			return value
+		}
+	}
+	return ""
 }
 
 func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string, upstreamRequestId string) (logs []*Log, total int64, err error) {

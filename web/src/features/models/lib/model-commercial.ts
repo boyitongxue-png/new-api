@@ -34,6 +34,7 @@ export type ModelCostEntry = {
   audio_input_per_second: number
   audio_output_per_second: number
   video_per_second: number
+  video_per_second_by_resolution: Record<string, number>
   request_fee: number
 }
 
@@ -70,6 +71,7 @@ export const emptyModelCost = (): ModelCostEntry => ({
   audio_input_per_second: 0,
   audio_output_per_second: 0,
   video_per_second: 0,
+  video_per_second_by_resolution: {},
   request_fee: 0,
 })
 

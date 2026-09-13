@@ -13,20 +13,21 @@ import (
 // ModelCost describes upstream cost in USD. Token prices use USD per 1M
 // tokens; unit prices use USD per image/second/request as named by the field.
 type ModelCost struct {
-	Currency              string  `json:"currency"`
-	InputPerMillion       float64 `json:"input_per_1m"`
-	OutputPerMillion      float64 `json:"output_per_1m"`
-	CacheReadPerMillion   float64 `json:"cache_read_per_1m"`
-	CacheWritePerMillion  float64 `json:"cache_write_per_1m"`
-	ImagePerUnit          float64 `json:"image_per_unit"`
-	ImageTokenPerMillion  float64 `json:"image_token_per_1m"`
-	AudioInputPerMillion  float64 `json:"audio_input_per_1m"`
-	AudioOutputPerMillion float64 `json:"audio_output_per_1m"`
-	AudioInputPerSecond   float64 `json:"audio_input_per_second"`
-	AudioOutputPerSecond  float64 `json:"audio_output_per_second"`
-	VideoPerSecond        float64 `json:"video_per_second"`
-	RequestFee            float64 `json:"request_fee"`
-	Enabled               bool    `json:"enabled"`
+	Currency                   string             `json:"currency"`
+	InputPerMillion            float64            `json:"input_per_1m"`
+	OutputPerMillion           float64            `json:"output_per_1m"`
+	CacheReadPerMillion        float64            `json:"cache_read_per_1m"`
+	CacheWritePerMillion       float64            `json:"cache_write_per_1m"`
+	ImagePerUnit               float64            `json:"image_per_unit"`
+	ImageTokenPerMillion       float64            `json:"image_token_per_1m"`
+	AudioInputPerMillion       float64            `json:"audio_input_per_1m"`
+	AudioOutputPerMillion      float64            `json:"audio_output_per_1m"`
+	AudioInputPerSecond        float64            `json:"audio_input_per_second"`
+	AudioOutputPerSecond       float64            `json:"audio_output_per_second"`
+	VideoPerSecond             float64            `json:"video_per_second"`
+	VideoPerSecondByResolution map[string]float64 `json:"video_per_second_by_resolution,omitempty"`
+	RequestFee                 float64            `json:"request_fee"`
+	Enabled                    bool               `json:"enabled"`
 }
 
 // ModelCostConfig is keyed by model name. The optional channel:<id>:<model>
@@ -78,6 +79,14 @@ func validatedModelCost(key string, cost ModelCost) (ModelCost, error) {
 	}
 	if err := validateModelCostValues(key, cost); err != nil {
 		return ModelCost{}, err
+	}
+	for resolution, price := range cost.VideoPerSecondByResolution {
+		if strings.TrimSpace(resolution) == "" {
+			return ModelCost{}, fmt.Errorf("ModelCost.%s.video_per_second_by_resolution contains an empty resolution", key)
+		}
+		if math.IsNaN(price) || math.IsInf(price, 0) || price < 0 || price > 1_000_000_000 {
+			return ModelCost{}, fmt.Errorf("ModelCost.%s.video_per_second_by_resolution.%s must be finite and between 0 and 1000000000", key, resolution)
+		}
 	}
 	return cost, nil
 }
@@ -201,6 +210,7 @@ type CostUsage struct {
 	AudioSeconds        int64
 	AudioOutputSeconds  int64
 	VideoSeconds        int64
+	VideoResolution     string
 	IncludeRequestFee   bool
 }
 
@@ -246,6 +256,15 @@ func CalculateCostAccountingWithUsage(modelName string, channelID int, quota int
 		if outputTextTokens < 0 {
 			outputTextTokens = 0
 		}
+		videoPrice := cost.VideoPerSecond
+		if resolution := normalizeCostResolution(usage.VideoResolution); resolution != "" {
+			for configuredResolution, configuredPrice := range cost.VideoPerSecondByResolution {
+				if normalizeCostResolution(configuredResolution) == resolution {
+					videoPrice = configuredPrice
+					break
+				}
+			}
+		}
 		for _, item := range []struct {
 			price      float64
 			units      int64
@@ -261,7 +280,7 @@ func CalculateCostAccountingWithUsage(modelName string, channelID int, quota int
 			{cost.AudioOutputPerMillion, usage.AudioOutputTokens, true},
 			{cost.AudioInputPerSecond, usage.AudioSeconds, false},
 			{cost.AudioOutputPerSecond, usage.AudioOutputSeconds, false},
-			{cost.VideoPerSecond, usage.VideoSeconds, false},
+			{videoPrice, usage.VideoSeconds, false},
 		} {
 			total = addCostMicros(total, costMicros(item.price, item.units, item.perMillion))
 		}
@@ -271,4 +290,25 @@ func CalculateCostAccountingWithUsage(modelName string, channelID int, quota int
 	}
 	accounting.ActualCostMicros = total
 	return accounting
+}
+
+func normalizeCostResolution(value string) string {
+	value = strings.ToLower(strings.TrimSpace(strings.ReplaceAll(value, "×", "x")))
+	value = strings.NewReplacer(" ", "", "_", "", "-", "").Replace(value)
+	switch value {
+	case "4k", "2160p", "2160", "4096p", "4096":
+		return "4k"
+	case "2k", "1440p", "1440", "2048p", "2048", "1440x1920", "1920x1440":
+		return "1440p"
+	case "1080p", "1920x1080", "1080x1920":
+		return "1080p"
+	case "768p", "768", "1376x768", "768x1376":
+		return "768p"
+	case "720p", "720", "1280x720", "720x1280", "1024x1024":
+		return "720p"
+	case "480p", "480", "854x480", "480x854":
+		return "480p"
+	default:
+		return value
+	}
 }

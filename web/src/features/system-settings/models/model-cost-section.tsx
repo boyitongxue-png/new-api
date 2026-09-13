@@ -23,6 +23,7 @@ type CostEntry = {
   audio_input_per_second: number
   audio_output_per_second: number
   video_per_second: number
+  video_per_second_by_resolution: Record<string, number>
   request_fee: number
 }
 
@@ -42,6 +43,7 @@ const emptyEntry = (): CostEntry => ({
   audio_input_per_second: 0,
   audio_output_per_second: 0,
   video_per_second: 0,
+  video_per_second_by_resolution: {},
   request_fee: 0,
 })
 
@@ -86,13 +88,15 @@ export function ModelCostSection({ defaultValue }: { defaultValue: string }) {
   const updateEntry = (
     key: string,
     field: keyof CostEntry,
-    value: string | boolean
+    value: string | boolean | Record<string, number>
   ) => {
-    let normalizedValue: string | number | boolean = value
+    let normalizedValue: string | number | boolean | Record<string, number> = value
     if (field === 'currency') {
       normalizedValue = String(value)
     } else if (field === 'enabled') {
       normalizedValue = Boolean(value)
+    } else if (field === 'video_per_second_by_resolution') {
+      normalizedValue = value as Record<string, number>
     } else {
       normalizedValue = Number(value) || 0
     }

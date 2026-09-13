@@ -234,18 +234,21 @@ func taskCostUsageFromResult(result *relaycommon.TaskInfo) (model.CostUsage, []s
 func taskBillingOtherWithCostUsage(task *model.Task, usage model.CostUsage, event string, rejected []string) map[string]interface{} {
 	other := taskBillingOther(task)
 	other["cost_usage"] = map[string]interface{}{
-		"usage_available": usage.UsageAvailable,
-		"prompt_tokens": usage.PromptTokens,
-		"completion_tokens": usage.CompletionTokens,
-		"cached_tokens": usage.CachedTokens,
+		"usage_available":       usage.UsageAvailable,
+		"prompt_tokens":         usage.PromptTokens,
+		"completion_tokens":     usage.CompletionTokens,
+		"cached_tokens":         usage.CachedTokens,
 		"cache_creation_tokens": usage.CacheCreationTokens,
-		"image_tokens": usage.ImageTokens,
-		"audio_input_tokens": usage.AudioInputTokens,
-		"audio_output_tokens": usage.AudioOutputTokens,
-		"image_count": usage.ImageCount,
-		"audio_seconds": usage.AudioSeconds,
-		"audio_output_seconds": usage.AudioOutputSeconds,
-		"video_seconds": usage.VideoSeconds,
+		"image_tokens":          usage.ImageTokens,
+		"audio_input_tokens":    usage.AudioInputTokens,
+		"audio_output_tokens":   usage.AudioOutputTokens,
+		"image_count":           usage.ImageCount,
+		"audio_seconds":         usage.AudioSeconds,
+		"audio_output_seconds":  usage.AudioOutputSeconds,
+		"video_seconds":         usage.VideoSeconds,
+	}
+	if bc := task.PrivateData.BillingContext; bc != nil && bc.BillingResolution != "" {
+		other["resolution"] = bc.BillingResolution
 	}
 	other["cost_usage_event"] = event
 	if len(rejected) > 0 {
@@ -423,7 +426,12 @@ func recalculateTaskQuotaWithUsage(ctx context.Context, task *model.Task, actual
 		Group:     task.Group,
 		Other:     other,
 		NodeName:  task.PrivateData.NodeName,
-		CostUsage: func() *model.CostUsage { if logType == model.LogTypeConsume { return &usage }; return nil }(),
+		CostUsage: func() *model.CostUsage {
+			if logType == model.LogTypeConsume {
+				return &usage
+			}
+			return nil
+		}(),
 	})
 }
 

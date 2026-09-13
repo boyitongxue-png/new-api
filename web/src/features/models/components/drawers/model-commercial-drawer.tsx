@@ -381,6 +381,14 @@ export function ModelCommercialDrawer(props: ModelCommercialDrawerProps) {
                     </Field>
                   ))}
                 </div>
+                {modelType === 'video' && (
+                  <ResolutionCostFields
+                    value={cost.video_per_second_by_resolution}
+                    onChange={(value) =>
+                      setCost({ ...cost, video_per_second_by_resolution: value })
+                    }
+                  />
+                )}
               </FieldGroup>
               <div className='flex justify-end border-t pt-4'>
                 <Button onClick={saveCost} disabled={isSavingCost}>
@@ -393,5 +401,47 @@ export function ModelCommercialDrawer(props: ModelCommercialDrawerProps) {
         </Tabs>
       </SheetContent>
     </Sheet>
+  )
+}
+
+function ResolutionCostFields(props: {
+  value: Record<string, number>
+  onChange: (value: Record<string, number>) => void
+}) {
+  const { t } = useTranslation()
+  const resolutions = ['480p', '720p', '768p', '1080p', '1440p', '4k']
+  const label = (resolution: string) => {
+    if (resolution === '1440p') return '2K'
+    if (resolution === '4k') return '4K'
+    return resolution.toUpperCase()
+  }
+  return (
+    <Field>
+      <FieldLabel>{t('Video')}</FieldLabel>
+      <FieldDescription>
+        {t(
+          'Configure upstream cost only; this does not change user pricing or model routing.'
+        )}
+      </FieldDescription>
+      <div className='grid gap-3 sm:grid-cols-2'>
+        {resolutions.map((resolution) => (
+          <div key={resolution} className='flex items-center gap-2'>
+            <span className='w-14 text-sm'>{label(resolution)}</span>
+            <Input
+              inputMode='decimal'
+              aria-label={`${resolution} ${t('Video')}`}
+              placeholder='0'
+              value={props.value[resolution] ?? ''}
+              onChange={(event) => {
+                const value = Number(event.target.value)
+                if (!Number.isFinite(value) || value < 0) return
+                props.onChange({ ...props.value, [resolution]: value })
+              }}
+            />
+            <span className='text-muted-foreground text-xs'>$ / sec</span>
+          </div>
+        ))}
+      </div>
+    </Field>
   )
 }

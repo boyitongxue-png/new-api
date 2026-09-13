@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -124,6 +125,42 @@ func normalizeClickHouseDSN(dsn string) string {
 	return parsed.String()
 }
 
+func normalizeSQLiteDSN(dsn string) (string, error) {
+	path, rawQuery, _ := strings.Cut(dsn, "?")
+	query, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return "", fmt.Errorf("invalid SQLite DSN query: %w", err)
+	}
+
+	busyTimeout := 30000
+	if legacyTimeout := query.Get("_busy_timeout"); legacyTimeout != "" {
+		if parsed, parseErr := strconv.Atoi(legacyTimeout); parseErr == nil && parsed > 0 {
+			busyTimeout = parsed
+		}
+		query.Del("_busy_timeout")
+	}
+
+	hasBusyTimeout := false
+	hasJournalMode := false
+	for _, pragma := range query["_pragma"] {
+		normalizedPragma := strings.ToLower(strings.TrimSpace(pragma))
+		hasBusyTimeout = hasBusyTimeout || strings.HasPrefix(normalizedPragma, "busy_timeout")
+		hasJournalMode = hasJournalMode || strings.HasPrefix(normalizedPragma, "journal_mode")
+	}
+	if !hasBusyTimeout {
+		query.Add("_pragma", fmt.Sprintf("busy_timeout(%d)", busyTimeout))
+	}
+	if !hasJournalMode {
+		query.Add("_pragma", "journal_mode(WAL)")
+	}
+	if query.Get("_txlock") == "" {
+		// Acquire the SQLite write reservation when a transaction begins. This
+		// avoids SQLITE_BUSY_SNAPSHOT when a read transaction upgrades to write.
+		query.Set("_txlock", "immediate")
+	}
+	return path + "?" + query.Encode(), nil
+}
+
 func chooseDB(envName string, isLog bool) (*gorm.DB, common.DatabaseType, error) {
 	dsn := os.Getenv(envName)
 	if dsn != "" {
@@ -146,7 +183,11 @@ func chooseDB(envName string, isLog bool) (*gorm.DB, common.DatabaseType, error)
 		}
 		if strings.HasPrefix(dsn, "local") {
 			common.SysLog("SQL_DSN not set, using SQLite as database")
-			db, err := gorm.Open(sqlite.Open(common.SQLitePath), newGormConfig(true))
+			sqliteDSN, err := normalizeSQLiteDSN(common.SQLitePath)
+			if err != nil {
+				return nil, "", err
+			}
+			db, err := gorm.Open(sqlite.Open(sqliteDSN), newGormConfig(true))
 			return db, common.DatabaseTypeSQLite, err
 		}
 		// Use MySQL
@@ -164,7 +205,11 @@ func chooseDB(envName string, isLog bool) (*gorm.DB, common.DatabaseType, error)
 	}
 	// Use SQLite
 	common.SysLog("SQL_DSN not set, using SQLite as database")
-	db, err := gorm.Open(sqlite.Open(common.SQLitePath), newGormConfig(true))
+	sqliteDSN, err := normalizeSQLiteDSN(common.SQLitePath)
+	if err != nil {
+		return nil, "", err
+	}
+	db, err := gorm.Open(sqlite.Open(sqliteDSN), newGormConfig(true))
 	return db, common.DatabaseTypeSQLite, err
 }
 
@@ -190,8 +235,16 @@ func InitDB() (err error) {
 		if err != nil {
 			return err
 		}
-		sqlDB.SetMaxIdleConns(common.GetEnvOrDefault("SQL_MAX_IDLE_CONNS", 100))
-		sqlDB.SetMaxOpenConns(common.GetEnvOrDefault("SQL_MAX_OPEN_CONNS", 1000))
+		defaultMaxIdleConns := 100
+		defaultMaxOpenConns := 1000
+		if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+			defaultMaxIdleConns = 2
+			defaultMaxOpenConns = 10
+		}
+		maxIdleConns := common.GetEnvOrDefault("SQL_MAX_IDLE_CONNS", defaultMaxIdleConns)
+		maxOpenConns := common.GetEnvOrDefault("SQL_MAX_OPEN_CONNS", defaultMaxOpenConns)
+		sqlDB.SetMaxIdleConns(maxIdleConns)
+		sqlDB.SetMaxOpenConns(maxOpenConns)
 		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 60)))
 
 		if !common.IsMasterNode {
@@ -234,8 +287,16 @@ func InitLogDB() (err error) {
 		if err != nil {
 			return err
 		}
-		sqlDB.SetMaxIdleConns(common.GetEnvOrDefault("SQL_MAX_IDLE_CONNS", 100))
-		sqlDB.SetMaxOpenConns(common.GetEnvOrDefault("SQL_MAX_OPEN_CONNS", 1000))
+		defaultMaxIdleConns := 100
+		defaultMaxOpenConns := 1000
+		if common.UsingLogDatabase(common.DatabaseTypeSQLite) {
+			defaultMaxIdleConns = 2
+			defaultMaxOpenConns = 10
+		}
+		maxIdleConns := common.GetEnvOrDefault("SQL_MAX_IDLE_CONNS", defaultMaxIdleConns)
+		maxOpenConns := common.GetEnvOrDefault("SQL_MAX_OPEN_CONNS", defaultMaxOpenConns)
+		sqlDB.SetMaxIdleConns(maxIdleConns)
+		sqlDB.SetMaxOpenConns(maxOpenConns)
 		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 60)))
 
 		if !common.IsMasterNode {
