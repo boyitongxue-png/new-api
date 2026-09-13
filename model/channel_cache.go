@@ -112,9 +112,13 @@ func SyncChannelCache(frequency int) {
 }
 
 func GetRandomSatisfiedChannel(group string, model string, retry int, requestPath string) (*Channel, error) {
+	return GetRandomSatisfiedChannelWithImageResolution(group, model, retry, requestPath, "")
+}
+
+func GetRandomSatisfiedChannelWithImageResolution(group string, model string, retry int, requestPath string, resolution string) (*Channel, error) {
 	// if memory cache is disabled, get channel directly from database
 	if !common.MemoryCacheEnabled {
-		return GetChannel(group, model, retry, requestPath)
+		return GetChannelWithImageResolution(group, model, retry, requestPath, resolution)
 	}
 
 	channelSyncLock.RLock()
@@ -131,6 +135,12 @@ func GetRandomSatisfiedChannel(group string, model string, retry int, requestPat
 
 	if len(channels) == 0 {
 		return nil, nil
+	}
+	if priced, ok := selectPricedImageChannels(channels, resolution); ok {
+		if retry >= len(priced) {
+			retry = len(priced) - 1
+		}
+		return priced[retry], nil
 	}
 
 	if len(channels) == 1 {
@@ -206,6 +216,21 @@ func GetRandomSatisfiedChannel(group string, model string, retry int, requestPat
 	}
 	// return null if no channel is not found
 	return nil, errors.New("channel not found")
+}
+
+func selectPricedImageChannels(ids []int, resolution string) ([]*Channel, bool) {
+	if resolution == "" {
+		return nil, false
+	}
+	all := make([]*Channel, 0, len(ids))
+	for _, id := range ids {
+		channel, ok := channelsIDM[id]
+		if !ok {
+			continue
+		}
+		all = append(all, channel)
+	}
+	return SelectLowestCostImageChannels(all, resolution)
 }
 
 // filterChannelsByRequestPathAndModel restricts candidates by request path and

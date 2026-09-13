@@ -209,6 +209,15 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		RequestPath: c.Request.URL.Path,
 		Retry:       common.GetPointer(0),
 	}
+	if imageRequest, ok := request.(*dto.ImageRequest); ok {
+		retryParam.ImageResolution = model.NormalizeImageResolution(imageRequest.Size)
+		if raw, exists := imageRequest.Extra["resolution"]; exists {
+			var resolution string
+			if common.Unmarshal(raw, &resolution) == nil {
+				retryParam.ImageResolution = model.NormalizeImageResolution(resolution)
+			}
+		}
+	}
 	relayInfo.RetryIndex = 0
 	relayInfo.LastError = nil
 
