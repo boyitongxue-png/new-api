@@ -265,7 +265,9 @@ export const channelFormSchema = z
     pass_through_body_enabled: z.boolean().optional(),
     system_prompt: z.string().optional(),
     system_prompt_override: z.boolean().optional(),
-    openai_video_profile: z.enum(['auto', 'seedance-2.5']).optional(),
+    openai_video_profile: z
+      .enum(['auto', 'seedance-2.5', 'starframe'])
+      .optional(),
     minimax_video_prompt_enhance: z.boolean().optional(),
     // Type-specific settings (stored in settings JSON)
     is_enterprise_account: z.boolean().optional(), // OpenRouter specific
@@ -485,7 +487,7 @@ export function transformChannelToFormDefaults(
     pass_through_body_enabled: false,
     system_prompt: '',
     system_prompt_override: false,
-    openai_video_profile: 'auto' as 'auto' | 'seedance-2.5',
+    openai_video_profile: 'auto' as 'auto' | 'seedance-2.5' | 'starframe',
     minimax_video_prompt_enhance: false,
   }
 
@@ -508,10 +510,11 @@ export function transformChannelToFormDefaults(
         pass_through_body_enabled: parsed.pass_through_body_enabled || false,
         system_prompt: parsed.system_prompt || '',
         system_prompt_override: parsed.system_prompt_override || false,
-        openai_video_profile:
-          parsed.openai_video_profile === 'seedance-2.5'
-            ? 'seedance-2.5'
-            : 'auto',
+        openai_video_profile: ['seedance-2.5', 'starframe'].includes(
+          parsed.openai_video_profile
+        )
+          ? parsed.openai_video_profile
+          : 'auto',
         minimax_video_prompt_enhance:
           parsed.minimax_video_prompt_enhance === true,
       }
@@ -656,9 +659,9 @@ export function buildSettingJSON(formData: ChannelFormValues): string {
 
   if (
     formData.type === CHANNEL_TYPE_OPENAI_VIDEO &&
-    formData.openai_video_profile === 'seedance-2.5'
+    ['seedance-2.5', 'starframe'].includes(formData.openai_video_profile || '')
   ) {
-    settingObj.openai_video_profile = 'seedance-2.5'
+    settingObj.openai_video_profile = formData.openai_video_profile
   }
 
   if (formData.type === CHANNEL_TYPE_MINIMAX_VIDEO) {

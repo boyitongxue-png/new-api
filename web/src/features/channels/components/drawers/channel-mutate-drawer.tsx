@@ -4132,6 +4132,10 @@ export function ChannelMutateDrawer({
                                               'Seedance 2.5 (unrestricted model names)'
                                             ),
                                           },
+                                          {
+                                            value: 'starframe',
+                                            label: t('StarFrame API'),
+                                          },
                                         ]}
                                         value={field.value || 'auto'}
                                         onValueChange={field.onChange}
@@ -4153,13 +4157,20 @@ export function ChannelMutateDrawer({
                                                 'Seedance 2.5 (unrestricted model names)'
                                               )}
                                             </SelectItem>
+                                            <SelectItem value='starframe'>
+                                              {t('StarFrame API')}
+                                            </SelectItem>
                                           </SelectGroup>
                                         </SelectContent>
                                       </Select>
                                       <FormDescription>
-                                        {t(
-                                          'When enabled, every downstream model on this channel uses the Seedance 2.5 request contract. Model mapping still controls the upstream model name.'
-                                        )}
+                                        {field.value === 'starframe'
+                                          ? t(
+                                              'Use for StarFrame API (api.xzapi.vip); references, frames, aspect ratio, and client task IDs are converted to its native contract.'
+                                            )
+                                          : t(
+                                              'When enabled, every downstream model on this channel uses the Seedance 2.5 request contract. Model mapping still controls the upstream model name.'
+                                            )}
                                       </FormDescription>
                                       <FormMessage />
                                     </FormItem>
@@ -4175,7 +4186,9 @@ export function ChannelMutateDrawer({
                                     <FormItem className='flex items-center justify-between px-4 py-3'>
                                       <div className='space-y-0.5'>
                                         <FormLabel>
-                                          {t('MiniMax Video Prompt Enhancement')}
+                                          {t(
+                                            'MiniMax Video Prompt Enhancement'
+                                          )}
                                         </FormLabel>
                                         <FormDescription>
                                           {t(

@@ -174,6 +174,22 @@ Optional environment variables:
   adaptor converts the request into the native `content[]` format required by
   the upstream.
 
+### StarFrame profile for Openai Video
+
+- For a type 60 `Openai Video` channel, select **StarFrame API** and configure
+  the provider base URL (for example, `https://api.xzapi.vip`) plus its Bearer
+  API key.
+- Converts the gateway's `ratio`, top-level media arrays, and start/end frame
+  aliases into StarFrame's native `aspect_ratio`, `references`, and `frames`
+  request fields.
+- Generates the required `client_task_id` from the gateway's stable public
+  task ID when the caller does not supply one, so retries remain idempotent.
+- Preserves native StarFrame `references` objects, including CH07 video/audio
+  items with `url` and `durationSeconds`, and applies documented per-model
+  duration, resolution, reference-count, and public-URL constraints.
+- Uses the existing Openai Video polling and authenticated content-cache path
+  for `GET /v1/videos/{task_id}` and `/content`.
+
 ## Grok Video native relay
 
 - Adds the independent `Grok Video` channel type `63` without changing the

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -42,7 +43,16 @@ const (
 	sd25MaxReferenceAudios = 10
 )
 
-var ModelList = []string{"seedance-2.0", "video-v3", "qy-seedance-2.5"}
+var ModelList = []string{
+	"seedance-2.0", "video-v3", "qy-seedance-2.5",
+	"ch0101-sd-2.0-720p", "ch0101-sd-2.0-1080p", "ch0101-sd-2.0-4k",
+	"ch0102-sd-2.0-720p", "ch0102-sd-2.0-1080p", "ch0103-sd-2.0-720p", "ch0104-sd-2.0-720p",
+	"ch0301-sd-2.0-720p", "ch0301-sd-2.0-1080p", "ch0301-sd-2.0-4k", "ch0301-sd-2.0-fast-720p", "ch0302-sd-2.0-720p",
+	"ch0702-sd-2.0-720p", "ch0703-sd-2.5-720p",
+	"ch8-sd-2.0-u2-720p", "ch8-sd-2.0-u3-720p",
+	"ch9-sd-2.0-ck-720p", "ch9-sd-2.0-ck2-720p", "ch0904-sd-2.0-720p", "ch0905-sd-2.0-720p", "ch0906-sd-2.0-720p",
+	"ch0907-sd-2.5-720p", "ch0907-sd-2.5-1080p", "ch0908-sd-2.5-720p", "ch0908-sd-2.5-1080p",
+}
 
 type videoProfile struct {
 	name                 string
@@ -53,6 +63,7 @@ type videoProfile struct {
 	maxReferenceImages   int
 	maxReferenceVideos   int
 	maxReferenceAudios   int
+	maxReferences        int
 	forceResolution      string
 	defaultResolution    string
 	allowedResolutions   []string
@@ -66,6 +77,7 @@ type videoProfile struct {
 	defaultGenerateAudio bool
 	validateSeed         bool
 	strictGridStrength   bool
+	starFrameContract    bool
 }
 
 var defaultVideoProfile = videoProfile{
@@ -87,6 +99,7 @@ var seedance25VideoProfile = videoProfile{
 	maxReferenceImages:   sd25MaxReferenceImages,
 	maxReferenceVideos:   sd25MaxReferenceVideos,
 	maxReferenceAudios:   sd25MaxReferenceAudios,
+	maxReferences:        50,
 	forceResolution:      "720p",
 	allowAutoRatio:       true,
 	nativeMultimodalMode: true,
@@ -111,6 +124,23 @@ var qySeedance25VideoProfile = videoProfile{
 	defaultGenerateAudio: true,
 	validateSeed:         true,
 	strictGridStrength:   true,
+}
+
+var starFrameVideoProfile = videoProfile{
+	name:                 "starframe",
+	defaultDuration:      5,
+	minDuration:          4,
+	maxDuration:          30,
+	maxReferenceImages:   sd25MaxReferenceImages,
+	maxReferenceVideos:   sd25MaxReferenceVideos,
+	maxReferenceAudios:   sd25MaxReferenceAudios,
+	maxReferences:        50,
+	allowedResolutions:   []string{"720p", "1080p", "4k"},
+	allowedRatios:        []string{"16:9", "9:16"},
+	supportsFrames:       true,
+	supportsEndFrame:     true,
+	framesConflictImages: true,
+	starFrameContract:    true,
 }
 
 type multimodalContent struct {
@@ -170,6 +200,11 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 		return service.TaskErrorWrapperLocal(err, "model_mapping_failed", http.StatusBadRequest)
 	}
 	profile := videoProfileForRequest(info, modelName, mappedModelName)
+	if profile.starFrameContract {
+		if err := validateStarFrameControlFields(payload); err != nil {
+			return service.TaskErrorWrapperLocal(err, "invalid_parameters", http.StatusBadRequest)
+		}
+	}
 
 	duration, err := normalizeDuration(payload, profile)
 	if err != nil {
@@ -204,6 +239,21 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 		for _, inputReference := range inputReferences {
 			images = appendUnique(images, inputReference)
 		}
+	}
+
+	var starFrameReferences any
+	if profile.starFrameContract {
+		starFrameReferences = payload["references"]
+		referenceImages, referenceVideos, referenceAudios, referenceErr := parseStarFrameReferences(starFrameReferences)
+		if referenceErr != nil {
+			return service.TaskErrorWrapperLocal(referenceErr, "invalid_references", http.StatusBadRequest)
+		}
+		if starFrameReferences != nil && len(images)+len(videos)+len(audios)+len(inputReferences) > 0 {
+			return service.TaskErrorWrapperLocal(fmt.Errorf("references cannot be combined with top-level reference media"), "invalid_references", http.StatusBadRequest)
+		}
+		images = appendUniqueValues(images, referenceImages)
+		videos = appendUniqueValues(videos, referenceVideos)
+		audios = appendUniqueValues(audios, referenceAudios)
 	}
 
 	var nativeContent *multimodalContent
@@ -251,17 +301,38 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 	if len(audios) > profile.maxReferenceAudios {
 		return service.TaskErrorWrapperLocal(fmt.Errorf("audios supports at most %d reference audios", profile.maxReferenceAudios), "invalid_audios", http.StatusBadRequest)
 	}
+	if profile.maxReferences > 0 && len(images)+len(videos)+len(audios) > profile.maxReferences {
+		return service.TaskErrorWrapperLocal(fmt.Errorf("references supports at most %d total media items", profile.maxReferences), "invalid_references", http.StatusBadRequest)
+	}
 	if profile.maxDurationWithVideo > 0 && len(videos) > 0 && duration > profile.maxDurationWithVideo {
 		return service.TaskErrorWrapperLocal(fmt.Errorf("duration with reference videos must be at most %d seconds", profile.maxDurationWithVideo), "invalid_duration", http.StatusBadRequest)
 	}
 
 	startFrameURL := payloadString(payload, "start_frame_url")
 	endFrameURL := payloadString(payload, "end_frame_url")
+	var starFrameFrames any
+	if profile.starFrameContract {
+		starFrameFrames = payload["frames"]
+		frameStart, frameEnd, frameErr := parseStarFrameFrames(starFrameFrames)
+		if frameErr != nil {
+			return service.TaskErrorWrapperLocal(frameErr, "invalid_frame_parameters", http.StatusBadRequest)
+		}
+		if starFrameFrames != nil && (startFrameURL != "" || endFrameURL != "") {
+			return service.TaskErrorWrapperLocal(fmt.Errorf("frames cannot be combined with start_frame_url or end_frame_url"), "invalid_frame_parameters", http.StatusBadRequest)
+		}
+		if starFrameFrames != nil {
+			startFrameURL = frameStart
+			endFrameURL = frameEnd
+		}
+	}
 	if (startFrameURL != "" || endFrameURL != "") && !profile.supportsFrames {
 		return service.TaskErrorWrapperLocal(fmt.Errorf("start_frame_url and end_frame_url are not supported for this model"), "invalid_frame_parameters", http.StatusBadRequest)
 	}
 	if endFrameURL != "" && startFrameURL == "" {
 		return service.TaskErrorWrapperLocal(fmt.Errorf("end_frame_url requires start_frame_url"), "invalid_frame_parameters", http.StatusBadRequest)
+	}
+	if profile.starFrameContract && startFrameURL != "" && endFrameURL == "" {
+		return service.TaskErrorWrapperLocal(fmt.Errorf("StarFrame frame mode requires both first and last frames"), "invalid_frame_parameters", http.StatusBadRequest)
 	}
 	if startFrameURL != "" {
 		if err := validateMediaURLs("images", []string{startFrameURL}); err != nil {
@@ -276,11 +347,22 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 			return service.TaskErrorWrapperLocal(fmt.Errorf("end_frame_url %w", err), "invalid_frame_parameters", http.StatusBadRequest)
 		}
 	}
+	if profile.starFrameContract {
+		if err := validateStarFrameURLs("frames", []string{startFrameURL, endFrameURL}); startFrameURL != "" && err != nil {
+			return service.TaskErrorWrapperLocal(err, "invalid_frame_parameters", http.StatusBadRequest)
+		}
+	}
 	if profile.framesConflictImages && startFrameURL != "" && len(images) > 0 {
 		return service.TaskErrorWrapperLocal(fmt.Errorf("start/end frame mode cannot be combined with images"), "invalid_frame_parameters", http.StatusBadRequest)
 	}
+	if profile.starFrameContract && startFrameURL != "" && len(images)+len(videos)+len(audios) > 0 {
+		return service.TaskErrorWrapperLocal(fmt.Errorf("StarFrame frame mode cannot be combined with reference media"), "invalid_frame_parameters", http.StatusBadRequest)
+	}
+	if profile.starFrameContract && starFrameFrames != nil && starFrameReferences != nil {
+		return service.TaskErrorWrapperLocal(fmt.Errorf("frames cannot be combined with references"), "invalid_frame_parameters", http.StatusBadRequest)
+	}
 
-	fast720 := isFast720Model(mappedModelName)
+	fast720 := isFast720Model(mappedModelName) && !profile.starFrameContract
 	if prompt == "" && (!fast720 || len(images) == 0) {
 		return service.TaskErrorWrapperLocal(fmt.Errorf("prompt field is required unless the fast-720p model receives at least one image"), "invalid_prompt", http.StatusBadRequest)
 	}
@@ -316,6 +398,17 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 	if err := validateMediaURLs("audios", audios); err != nil {
 		return service.TaskErrorWrapperLocal(err, "invalid_audios", http.StatusBadRequest)
 	}
+	if profile.starFrameContract {
+		if err := validateStarFrameURLs("images", images); err != nil {
+			return service.TaskErrorWrapperLocal(err, "invalid_images", http.StatusBadRequest)
+		}
+		if err := validateStarFrameURLs("videos", videos); err != nil {
+			return service.TaskErrorWrapperLocal(err, "invalid_videos", http.StatusBadRequest)
+		}
+		if err := validateStarFrameURLs("audios", audios); err != nil {
+			return service.TaskErrorWrapperLocal(err, "invalid_audios", http.StatusBadRequest)
+		}
+	}
 	usesMultimodalContent := profile.nativeMultimodalMode && (nativeContent != nil || len(videos) > 0 || len(audios) > 0)
 	var upstreamContent []any
 	if usesMultimodalContent {
@@ -325,7 +418,6 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 			upstreamContent = buildMultimodalContent(prompt, images, videos, audios)
 		}
 	}
-
 	upstreamPayload := make(map[string]any, len(payload)+6)
 	for key, value := range payload {
 		upstreamPayload[key] = value
@@ -380,6 +472,9 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 		if len(audios) > 0 {
 			upstreamPayload["audios"] = audios
 		}
+	}
+	if profile.starFrameContract {
+		upstreamPayload = buildStarFramePayload(payload, modelName, prompt, duration, ratio, resolution, images, videos, audios, starFrameReferences, starFrameFrames, startFrameURL, endFrameURL)
 	}
 
 	request := relaycommon.TaskSubmitReq{
@@ -452,6 +547,12 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 		payload[key] = value
 	}
 	payload["model"] = info.UpstreamModelName
+	if payloadString(payload, "client_task_id") == "" && videoProfileForRequest(info, info.OriginModelName, info.UpstreamModelName).starFrameContract {
+		if info.PublicTaskID == "" {
+			info.PublicTaskID = model.GenerateTaskID()
+		}
+		payload["client_task_id"] = info.PublicTaskID
+	}
 
 	body, err := common.Marshal(payload)
 	if err != nil {
@@ -735,8 +836,186 @@ func normalizeOpenAIVideoAliases(payload map[string]any) error {
 	return nil
 }
 
+var starFrameClientTaskIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
+
+func validateStarFrameControlFields(payload map[string]any) error {
+	mode := strings.ToLower(payloadString(payload, "mode"))
+	if mode != "" && mode != "references" && mode != "frames" {
+		return fmt.Errorf("mode must be references or frames")
+	}
+	clientTaskID := payloadString(payload, "client_task_id")
+	if clientTaskID != "" && (len(clientTaskID) > 128 || !starFrameClientTaskIDPattern.MatchString(clientTaskID)) {
+		return fmt.Errorf("client_task_id must be at most 128 characters and contain only letters, numbers, underscores, hyphens, or dots")
+	}
+	if mode == "frames" && payload["frames"] == nil && payloadString(payload, "start_frame_url") == "" {
+		return fmt.Errorf("frames is required when mode is frames")
+	}
+	if mode == "references" && (payload["frames"] != nil || payloadString(payload, "start_frame_url") != "" || payloadString(payload, "end_frame_url") != "") {
+		return fmt.Errorf("frames cannot be used when mode is references")
+	}
+	if mode == "frames" && payload["references"] != nil {
+		return fmt.Errorf("references cannot be used when mode is frames")
+	}
+	return nil
+}
+
+func parseStarFrameReferences(value any) ([]string, []string, []string, error) {
+	if value == nil {
+		return nil, nil, nil, nil
+	}
+	references, ok := value.(map[string]any)
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("references must be an object")
+	}
+	images, err := starFrameReferenceURLs(references, "image", "images")
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	videos, err := starFrameReferenceURLs(references, "video", "videos")
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	audios, err := starFrameReferenceURLs(references, "audio", "audios")
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return images, videos, audios, nil
+}
+
+func starFrameReferenceURLs(references map[string]any, singular, plural string) ([]string, error) {
+	singularValue, hasSingular := references[singular]
+	pluralValue, hasPlural := references[plural]
+	if hasSingular && singularValue != nil && hasPlural && pluralValue != nil {
+		return nil, fmt.Errorf("references.%s and references.%s are mutually exclusive", singular, plural)
+	}
+	value := singularValue
+	field := singular
+	if !hasSingular || singularValue == nil {
+		value = pluralValue
+		field = plural
+	}
+	if value == nil {
+		return nil, nil
+	}
+	items := []any{value}
+	if field == plural {
+		var ok bool
+		items, ok = value.([]any)
+		if !ok || len(items) < 2 {
+			return nil, fmt.Errorf("references.%s must contain at least two items", plural)
+		}
+	}
+	urls := make([]string, 0, len(items))
+	for index, item := range items {
+		mediaURL := ""
+		switch typed := item.(type) {
+		case string:
+			mediaURL = strings.TrimSpace(typed)
+		case map[string]any:
+			mediaURL = payloadString(typed, "url")
+		default:
+			return nil, fmt.Errorf("references.%s[%d] must be a URL string or object", field, index)
+		}
+		if mediaURL == "" {
+			return nil, fmt.Errorf("references.%s[%d].url is required", field, index)
+		}
+		urls = appendUnique(urls, mediaURL)
+	}
+	return urls, nil
+}
+
+func parseStarFrameFrames(value any) (string, string, error) {
+	if value == nil {
+		return "", "", nil
+	}
+	frames, ok := value.(map[string]any)
+	if !ok {
+		return "", "", fmt.Errorf("frames must be an object")
+	}
+	firstFrame := payloadString(frames, "first_frame")
+	lastFrame := payloadString(frames, "last_frame")
+	if firstFrame == "" || lastFrame == "" {
+		return "", "", fmt.Errorf("frames.first_frame and frames.last_frame are required")
+	}
+	return firstFrame, lastFrame, nil
+}
+
+func appendUniqueValues(values []string, candidates []string) []string {
+	for _, candidate := range candidates {
+		values = appendUnique(values, candidate)
+	}
+	return values
+}
+
+func validateStarFrameURLs(field string, values []string) error {
+	for index, value := range values {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		parsed, err := url.ParseRequestURI(strings.TrimSpace(value))
+		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return fmt.Errorf("%s[%d] must be a public HTTP or HTTPS URL for StarFrame", field, index)
+		}
+	}
+	return nil
+}
+
+func buildStarFramePayload(payload map[string]any, modelName, prompt string, duration int, ratio, resolution string, images, videos, audios []string, references, frames any, startFrameURL, endFrameURL string) map[string]any {
+	upstream := map[string]any{
+		"model":        modelName,
+		"prompt":       prompt,
+		"duration":     duration,
+		"aspect_ratio": ratio,
+		"resolution":   resolution,
+	}
+	if clientTaskID := payloadString(payload, "client_task_id"); clientTaskID != "" {
+		upstream["client_task_id"] = clientTaskID
+	}
+
+	if frames != nil || startFrameURL != "" || endFrameURL != "" {
+		upstream["mode"] = "frames"
+		if frames != nil {
+			upstream["frames"] = frames
+		} else {
+			upstream["frames"] = map[string]any{
+				"first_frame": startFrameURL,
+				"last_frame":  endFrameURL,
+			}
+		}
+		return upstream
+	}
+
+	upstream["mode"] = "references"
+	if references != nil {
+		upstream["references"] = references
+		return upstream
+	}
+	starFrameReferences := make(map[string]any)
+	addStarFrameReferences(starFrameReferences, "image", "images", images)
+	addStarFrameReferences(starFrameReferences, "video", "videos", videos)
+	addStarFrameReferences(starFrameReferences, "audio", "audios", audios)
+	if len(starFrameReferences) > 0 {
+		upstream["references"] = starFrameReferences
+	}
+	return upstream
+}
+
+func addStarFrameReferences(references map[string]any, singular, plural string, values []string) {
+	switch len(values) {
+	case 0:
+		return
+	case 1:
+		references[singular] = values[0]
+	default:
+		references[plural] = values
+	}
+}
+
 func videoProfileForRequest(info *relaycommon.RelayInfo, modelNames ...string) videoProfile {
 	if info != nil && info.ChannelMeta != nil {
+		if normalizeOpenAIVideoProfile(info.ChannelSetting.OpenAIVideoProfile) == "starframe" {
+			return starFrameProfileForModels(modelNames...)
+		}
 		for _, modelName := range modelNames {
 			if isQYSeedance25ModelName(modelName) {
 				return qySeedance25VideoProfile
@@ -758,6 +1037,8 @@ func normalizeOpenAIVideoProfile(profile string) string {
 	normalized := strings.ToLower(strings.TrimSpace(profile))
 	normalized = strings.NewReplacer("_", "-", " ", "").Replace(normalized)
 	switch normalized {
+	case "starframe", "star-frame", "xzapi", "xzapi.vip":
+		return "starframe"
 	case "qy-seedance-2.5":
 		return "qy-seedance-2.5"
 	case "seedance-2.5", "seedance2.5", "sd-2.5", "sd2.5", "video-v3":
@@ -767,6 +1048,54 @@ func normalizeOpenAIVideoProfile(profile string) string {
 	default:
 		return ""
 	}
+}
+
+func starFrameProfileForModels(modelNames ...string) videoProfile {
+	profile := starFrameVideoProfile
+	for _, modelName := range modelNames {
+		normalized := strings.ToLower(strings.TrimSpace(modelName))
+		if normalized == "" || (!strings.Contains(normalized, "sd-2.0") && !strings.Contains(normalized, "sd-2.5")) {
+			continue
+		}
+		isSeedance25 := strings.Contains(normalized, "sd-2.5")
+		switch {
+		case strings.Contains(normalized, "ch0907-sd-2.5"):
+			profile.maxDuration = 29
+		case strings.Contains(normalized, "sd-2.5"):
+			profile.maxDuration = 30
+		case strings.Contains(normalized, "ch0102-"),
+			strings.Contains(normalized, "ch0103-"),
+			strings.Contains(normalized, "ch0104-"),
+			strings.Contains(normalized, "ch0301-"),
+			strings.Contains(normalized, "ch0302-"):
+			profile.maxDuration = 15
+		case strings.HasPrefix(normalized, "ch"):
+			profile.minDuration = 5
+			profile.maxDuration = 15
+		}
+		if !isSeedance25 {
+			profile.maxReferenceImages = 9
+			profile.maxReferenceVideos = 3
+			profile.maxReferenceAudios = 3
+			profile.maxReferences = 12
+		}
+		if strings.Contains(normalized, "ch0103-") || strings.Contains(normalized, "ch0301-") || strings.Contains(normalized, "ch0302-") {
+			profile.maxReferenceVideos = 0
+		}
+		if strings.Contains(normalized, "ch0906-") {
+			profile.allowedDurations = []int{5, 10, 15}
+		}
+		switch {
+		case strings.Contains(normalized, "-4k"):
+			profile.forceResolution = "4k"
+		case strings.Contains(normalized, "-1080p"):
+			profile.forceResolution = "1080p"
+		case strings.Contains(normalized, "-720p"):
+			profile.forceResolution = "720p"
+		}
+		return profile
+	}
+	return profile
 }
 
 func videoProfileForModels(modelNames ...string) videoProfile {

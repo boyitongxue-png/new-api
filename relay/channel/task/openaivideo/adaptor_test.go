@@ -422,6 +422,159 @@ func TestSeedance25ChannelProfileAcceptsCustomDownstreamModelName(t *testing.T) 
 	assert.Equal(t, "seedance-2.5", request.Metadata["video_profile"])
 }
 
+func TestStarFrameProfileBuildsNativeReferencesContract(t *testing.T) {
+	requestBody, err := common.Marshal(map[string]any{
+		"model":          "customer-video",
+		"prompt":         "animate the product with a smooth camera movement",
+		"duration":       12,
+		"ratio":          "9:16",
+		"resolution":     "1080p",
+		"images":         []string{"https://assets.example/one.png", "https://assets.example/two.png"},
+		"audios":         []string{"https://assets.example/music.mp3"},
+		"generate_audio": true,
+	})
+	require.NoError(t, err)
+
+	c, adaptor, info := newOpenAIVideoRequestContext(t, "/v1/videos", "application/json", bytes.NewReader(requestBody))
+	info.ChannelSetting.OpenAIVideoProfile = "starframe"
+	info.UpstreamModelName = "ch0908-sd-2.5-1080p"
+	info.PublicTaskID = "task_public_123"
+	c.Set("model_mapping", `{"customer-video":"ch0908-sd-2.5-1080p"}`)
+
+	require.Nil(t, adaptor.ValidateRequestAndSetAction(c, info))
+	body, err := adaptor.BuildRequestBody(c, info)
+	require.NoError(t, err)
+	encoded, err := io.ReadAll(body)
+	require.NoError(t, err)
+
+	var upstream map[string]any
+	require.NoError(t, common.Unmarshal(encoded, &upstream))
+	assert.Equal(t, "ch0908-sd-2.5-1080p", upstream["model"])
+	assert.Equal(t, "task_public_123", upstream["client_task_id"])
+	assert.Equal(t, "references", upstream["mode"])
+	assert.Equal(t, "9:16", upstream["aspect_ratio"])
+	assert.NotContains(t, upstream, "ratio")
+	assert.NotContains(t, upstream, "generate_audio")
+	references, ok := upstream["references"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, []any{"https://assets.example/one.png", "https://assets.example/two.png"}, references["images"])
+	assert.Equal(t, "https://assets.example/music.mp3", references["audio"])
+}
+
+func TestStarFrameProfilePreservesNativeCH07ReferenceObjects(t *testing.T) {
+	nativeReferences := map[string]any{
+		"image": "https://assets.example/reference.png",
+		"videos": []any{
+			map[string]any{"url": "https://assets.example/one.mp4", "durationSeconds": 6},
+			map[string]any{"url": "https://assets.example/two.mp4", "durationSeconds": 7},
+		},
+	}
+	requestBody, err := common.Marshal(map[string]any{
+		"model":          "ch0703-sd-2.5-720p",
+		"prompt":         "combine all references into one continuous scene",
+		"duration":       20,
+		"aspect_ratio":   "16:9",
+		"references":     nativeReferences,
+		"client_task_id": "order.2026-09-16_01",
+	})
+	require.NoError(t, err)
+
+	c, adaptor, info := newOpenAIVideoRequestContext(t, "/v1/videos", "application/json", bytes.NewReader(requestBody))
+	info.ChannelSetting.OpenAIVideoProfile = "starframe"
+	info.UpstreamModelName = "ch0703-sd-2.5-720p"
+	require.Nil(t, adaptor.ValidateRequestAndSetAction(c, info))
+	body, err := adaptor.BuildRequestBody(c, info)
+	require.NoError(t, err)
+	encoded, err := io.ReadAll(body)
+	require.NoError(t, err)
+
+	var upstream map[string]any
+	require.NoError(t, common.Unmarshal(encoded, &upstream))
+	references, ok := upstream["references"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "https://assets.example/reference.png", references["image"])
+	referenceVideos, ok := references["videos"].([]any)
+	require.True(t, ok)
+	require.Len(t, referenceVideos, 2)
+	firstVideo, ok := referenceVideos[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "https://assets.example/one.mp4", firstVideo["url"])
+	assert.Equal(t, float64(6), firstVideo["durationSeconds"])
+	assert.Equal(t, "order.2026-09-16_01", upstream["client_task_id"])
+	assert.Equal(t, "720p", upstream["resolution"])
+}
+
+func TestStarFrameProfileBuildsFramesContractAndValidatesModelDuration(t *testing.T) {
+	requestBody, err := common.Marshal(map[string]any{
+		"model":           "ch0101-sd-2.0-720p",
+		"prompt":          "transition naturally between the supplied frames",
+		"duration":        5,
+		"start_frame_url": "https://assets.example/start.png",
+		"end_frame_url":   "https://assets.example/end.png",
+	})
+	require.NoError(t, err)
+	c, adaptor, info := newOpenAIVideoRequestContext(t, "/v1/videos", "application/json", bytes.NewReader(requestBody))
+	info.ChannelSetting.OpenAIVideoProfile = "starframe"
+	info.UpstreamModelName = "ch0101-sd-2.0-720p"
+	require.Nil(t, adaptor.ValidateRequestAndSetAction(c, info))
+	body, err := adaptor.BuildRequestBody(c, info)
+	require.NoError(t, err)
+	encoded, err := io.ReadAll(body)
+	require.NoError(t, err)
+
+	var upstream map[string]any
+	require.NoError(t, common.Unmarshal(encoded, &upstream))
+	assert.Equal(t, "frames", upstream["mode"])
+	assert.Equal(t, map[string]any{
+		"first_frame": "https://assets.example/start.png",
+		"last_frame":  "https://assets.example/end.png",
+	}, upstream["frames"])
+
+	invalidBody, err := common.Marshal(map[string]any{
+		"model":    "ch0101-sd-2.0-720p",
+		"prompt":   "this duration is below the provider minimum",
+		"duration": 4,
+	})
+	require.NoError(t, err)
+	invalidContext, invalidAdaptor, invalidInfo := newOpenAIVideoRequestContext(t, "/v1/videos", "application/json", bytes.NewReader(invalidBody))
+	invalidInfo.ChannelSetting.OpenAIVideoProfile = "starframe"
+	invalidInfo.UpstreamModelName = "ch0101-sd-2.0-720p"
+	taskErr := invalidAdaptor.ValidateRequestAndSetAction(invalidContext, invalidInfo)
+	require.NotNil(t, taskErr)
+	assert.Equal(t, "invalid_duration", taskErr.Code)
+}
+
+func TestStarFrameProfileRejectsInvalidClientTaskID(t *testing.T) {
+	requestBody, err := common.Marshal(map[string]any{
+		"model":          "ch0908-sd-2.5-720p",
+		"prompt":         "animate the supplied scene with natural motion",
+		"client_task_id": "contains spaces",
+	})
+	require.NoError(t, err)
+	c, adaptor, info := newOpenAIVideoRequestContext(t, "/v1/videos", "application/json", bytes.NewReader(requestBody))
+	info.ChannelSetting.OpenAIVideoProfile = "starframe"
+	taskErr := adaptor.ValidateRequestAndSetAction(c, info)
+	require.NotNil(t, taskErr)
+	assert.Equal(t, "invalid_parameters", taskErr.Code)
+}
+
+func TestStarFrameProfileRejectsReferenceMediaInFramesMode(t *testing.T) {
+	requestBody, err := common.Marshal(map[string]any{
+		"model":    "ch0908-sd-2.5-720p",
+		"prompt":   "transition between frames while using reference media",
+		"mode":     "frames",
+		"frames":   map[string]any{"first_frame": "https://assets.example/start.png", "last_frame": "https://assets.example/end.png"},
+		"videos":   []string{"https://assets.example/reference.mp4"},
+		"duration": 10,
+	})
+	require.NoError(t, err)
+	c, adaptor, info := newOpenAIVideoRequestContext(t, "/v1/videos", "application/json", bytes.NewReader(requestBody))
+	info.ChannelSetting.OpenAIVideoProfile = "starframe"
+	taskErr := adaptor.ValidateRequestAndSetAction(c, info)
+	require.NotNil(t, taskErr)
+	assert.Equal(t, "invalid_frame_parameters", taskErr.Code)
+}
+
 func TestVideoV3RejectsOutOfRangeDurationAndReferenceCounts(t *testing.T) {
 	images := make([]string, 31)
 	videos := make([]string, 11)
@@ -696,11 +849,11 @@ func TestParseTaskResultUsesCompletedMetadataURL(t *testing.T) {
 	completed, err := adaptor.ParseTaskResult([]byte(`{
 		"id":"task_upstream",
 		"status":"completed",
-		"metadata":{"url":"https://videos.example/final.mp4"}
+		"metadata":{"url":"/v1/videos/task_upstream/content"}
 	}`))
 	require.NoError(t, err)
 	assert.Equal(t, model.TaskStatusSuccess, completed.Status)
-	assert.Equal(t, "https://videos.example/final.mp4", completed.Url)
+	assert.Equal(t, "/v1/videos/task_upstream/content", completed.Url)
 }
 
 func TestParseTaskResultHandlesStatusesAndErrors(t *testing.T) {
