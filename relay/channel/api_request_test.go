@@ -1,11 +1,17 @@
 package channel
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	taskdto "github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/model"
+
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -191,3 +197,175 @@ func TestProcessHeaderOverride_PassHeadersTemplateSetsRuntimeHeaders(t *testing.
 	require.Equal(t, "sess-123", upstreamReq.Header.Get("Session_id"))
 	require.Empty(t, upstreamReq.Header.Get("X-Codex-Beta-Features"))
 }
+
+func TestDoTaskAvailabilityProbeUsesReadOnlyRequest(t *testing.T) {
+	service.InitHttpClient()
+	gin.SetMode(gin.TestMode)
+	var method string
+	var authorization string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method = r.Method
+		authorization = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/videos", strings.NewReader("original task body"))
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
+
+	err := DoTaskAvailabilityProbe(c, info, http.MethodGet, server.URL+"/v1/models", func(probe *http.Request) error {
+		probe.Header.Set("Authorization", "Bearer test-key")
+		return nil
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, http.MethodGet, method)
+	require.Equal(t, "Bearer test-key", authorization)
+	remaining, readErr := io.ReadAll(c.Request.Body)
+	require.NoError(t, readErr)
+	require.Equal(t, "original task body", string(remaining))
+}
+
+func TestDoTaskAvailabilityProbeRejectsUnavailableProvider(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", nil)
+	err := DoTaskAvailabilityProbe(c, &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}, http.MethodGet, server.URL+"/v1/models", nil)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "status 401")
+}
+
+func TestDoTaskAvailabilityProbeTreatsNotFoundAsUnavailable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", nil)
+	err := DoTaskAvailabilityProbe(c, &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}, http.MethodGet, server.URL+"/v1/models", nil)
+
+	require.Error(t, err)
+	require.NotErrorIs(t, err, ErrTaskAvailabilityProbeUnsupported)
+	require.Contains(t, err.Error(), "status 404")
+}
+
+func TestDoTaskAvailabilityProbeAllowUnsupported(t *testing.T) {
+	for _, status := range []int{
+		http.StatusBadRequest,
+		http.StatusUnprocessableEntity,
+		http.StatusNotFound,
+		http.StatusMethodNotAllowed,
+		http.StatusNotImplemented,
+	} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(status)
+			}))
+			defer server.Close()
+
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", strings.NewReader("payload"))
+			err := DoTaskAvailabilityProbeAllowUnsupported(c, &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}, http.MethodGet, server.URL+"/v1/models", nil)
+
+			require.ErrorIs(t, err, ErrTaskAvailabilityProbeUnsupported)
+			body, readErr := io.ReadAll(c.Request.Body)
+			require.NoError(t, readErr)
+			require.Equal(t, "payload", string(body))
+		})
+	}
+}
+
+func TestDoTaskAvailabilityHeadProbeTreatsUnsupportedAsNonBlocking(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodHead, r.Method)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}))
+	defer server.Close()
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", strings.NewReader("payload"))
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
+
+	err := DoTaskAvailabilityHeadProbe(testTaskAdaptor{}, c, info, server.URL+"/v1/videos")
+	require.ErrorIs(t, err, ErrTaskAvailabilityProbeUnsupported)
+	body, readErr := io.ReadAll(c.Request.Body)
+	require.NoError(t, readErr)
+	require.Equal(t, "payload", string(body))
+}
+
+func TestDoTaskAvailabilityHeadProbeRejectsAuthAndServerFailures(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests, http.StatusBadGateway} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(status)
+			}))
+			defer server.Close()
+
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", nil)
+			err := DoTaskAvailabilityHeadProbe(testTaskAdaptor{}, c, &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}, server.URL+"/v1/videos")
+			require.Error(t, err)
+			require.NotErrorIs(t, err, ErrTaskAvailabilityProbeUnsupported)
+		})
+	}
+}
+
+func TestDoTaskAvailabilityHeadProbeAllowsPayloadValidationStatuses(t *testing.T) {
+	for _, status := range []int{http.StatusBadRequest, http.StatusUnprocessableEntity} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(status)
+			}))
+			defer server.Close()
+
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", nil)
+			err := DoTaskAvailabilityHeadProbe(testTaskAdaptor{}, c, &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}, server.URL+"/v1/videos")
+			require.NoError(t, err)
+		})
+	}
+}
+
+type testTaskAdaptor struct{}
+
+func (testTaskAdaptor) Init(*relaycommon.RelayInfo) {}
+func (testTaskAdaptor) ValidateRequestAndSetAction(*gin.Context, *relaycommon.RelayInfo) *taskdto.TaskError {
+	return nil
+}
+func (testTaskAdaptor) EstimateBilling(*gin.Context, *relaycommon.RelayInfo) map[string]float64 {
+	return nil
+}
+func (testTaskAdaptor) AdjustBillingOnSubmit(*relaycommon.RelayInfo, []byte) map[string]float64 {
+	return nil
+}
+func (testTaskAdaptor) AdjustBillingOnComplete(*model.Task, *relaycommon.TaskInfo) int { return 0 }
+func (testTaskAdaptor) BuildRequestURL(*relaycommon.RelayInfo) (string, error) {
+	return "", nil
+}
+func (testTaskAdaptor) BuildRequestHeader(_ *gin.Context, req *http.Request, _ *relaycommon.RelayInfo) error {
+	req.Header.Set("Authorization", "Bearer test-key")
+	return nil
+}
+func (testTaskAdaptor) BuildRequestBody(*gin.Context, *relaycommon.RelayInfo) (io.Reader, error) {
+	return nil, nil
+}
+func (testTaskAdaptor) DoRequest(*gin.Context, *relaycommon.RelayInfo, io.Reader) (*http.Response, error) {
+	return nil, nil
+}
+func (testTaskAdaptor) DoResponse(*gin.Context, *http.Response, *relaycommon.RelayInfo) (string, []byte, *taskdto.TaskError) {
+	return "", nil, nil
+}
+func (testTaskAdaptor) GetModelList() []string { return nil }
+func (testTaskAdaptor) GetChannelName() string { return "" }
+func (testTaskAdaptor) FetchTask(string, string, map[string]any, string) (*http.Response, error) {
+	return nil, nil
+}
+func (testTaskAdaptor) ParseTaskResult([]byte) (*relaycommon.TaskInfo, error) { return nil, nil }

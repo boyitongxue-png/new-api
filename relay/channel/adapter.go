@@ -79,6 +79,13 @@ type TaskAdaptor interface {
 	ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, error)
 }
 
+// TaskAvailabilityProbe is implemented by adaptors that expose a provider
+// endpoint which can validate credentials/model availability without creating
+// a billable task. Adaptors without a safe probe are left unchanged.
+type TaskAvailabilityProbe interface {
+	ProbeAvailability(c *gin.Context, info *relaycommon.RelayInfo) error
+}
+
 type OpenAIVideoConverter interface {
 	ConvertToOpenAIVideo(originTask *model.Task) ([]byte, error)
 }

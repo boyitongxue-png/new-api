@@ -257,6 +257,15 @@ func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, _ *r
 	return nil
 }
 
+func (a *TaskAdaptor) ProbeAvailability(c *gin.Context, info *relaycommon.RelayInfo) error {
+	endpoint := strings.TrimRight(a.baseURL, "/") + "/v1/models"
+	return channel.DoTaskAvailabilityProbeAllowUnsupported(c, info, http.MethodGet, endpoint, func(req *http.Request) error {
+		req.Header.Set("Authorization", "Bearer "+a.apiKey)
+		req.Header.Set("Accept", "application/json")
+		return nil
+	})
+}
+
 func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayInfo) (io.Reader, error) {
 	value, ok := c.Get(normalizedRequestContextKey)
 	if !ok {

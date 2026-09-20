@@ -149,9 +149,10 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	needCountToken := constant.CountToken
+	isCodexResponses := relayFormat == types.RelayFormatOpenAIResponses && relayInfo.GetChannelType() == constant.ChannelTypeCodex
 	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.
 	var meta *types.TokenCountMeta
-	if needSensitiveCheck || needCountToken {
+	if needSensitiveCheck || needCountToken || isCodexResponses {
 		meta = request.GetTokenCountMeta()
 	} else {
 		meta = fastTokenCountMetaForPricing(request)
@@ -170,6 +171,22 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeCountTokenFailed)
 		return
+	}
+
+	if isCodexResponses {
+		// EstimateRequestToken intentionally returns zero when CountToken is
+		// disabled. Codex still needs a context guard, so retain the larger of
+		// the normal estimate and the text-only estimate from the full request
+		// metadata collected above.
+		contextTokens := tokens
+		if meta != nil {
+			contextTokens = max(contextTokens, service.CountTextToken(meta.CombineText, relayInfo.OriginModelName))
+		}
+		if err := relaycommon.ValidateCodexContextTokens(relayInfo.GetChannelType(), contextTokens); err != nil {
+			logger.LogWarn(c, err.Error())
+			newAPIError = types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+			return
+		}
 	}
 
 	relayInfo.SetEstimatePromptTokens(tokens)

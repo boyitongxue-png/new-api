@@ -25,6 +25,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const taskAvailabilityProbeTimeout = 10 * time.Second
+
 // applyUpstreamContentLength populates req.ContentLength when the upstream
 // body is wrapped in a BodyStorage (see relay/common/outbound_body.go).
 //
@@ -475,6 +477,9 @@ func DoRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	return doRequest(c, req, info)
 }
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
+	if info == nil {
+		return nil, errors.New("relay info is nil")
+	}
 	client, err := service.GetHttpClientWithProxySettings(info.ChannelSetting.Proxy, info.ChannelSetting)
 	if err != nil {
 		return nil, fmt.Errorf("new proxy http client failed: %w", err)
@@ -562,4 +567,141 @@ func DoTaskApiRequest(a TaskAdaptor, c *gin.Context, info *common.RelayInfo, req
 		return nil, fmt.Errorf("do request failed: %w", err)
 	}
 	return resp, nil
+}
+
+// DoTaskAvailabilityProbe sends a non-creating provider probe. Only adaptors
+// with a documented safe endpoint should call this helper.
+func DoTaskAvailabilityProbe(c *gin.Context, info *common.RelayInfo, method, endpoint string, setup func(*http.Request) error) error {
+	return doTaskAvailabilityProbe(c, info, method, endpoint, setup, false)
+}
+
+// DoTaskAvailabilityProbeAllowUnsupported is the best-effort variant for
+// optional provider endpoints such as OpenAI-compatible /v1/models. A 404,
+// 405, or 501 means that the endpoint is not exposed, so the caller should
+// continue with the real task request rather than rejecting the channel.
+func DoTaskAvailabilityProbeAllowUnsupported(c *gin.Context, info *common.RelayInfo, method, endpoint string, setup func(*http.Request) error) error {
+	return doTaskAvailabilityProbe(c, info, method, endpoint, setup, true)
+}
+
+func doTaskAvailabilityProbe(c *gin.Context, info *common.RelayInfo, method, endpoint string, setup func(*http.Request) error, allowUnsupported bool) error {
+	if c == nil || c.Request == nil || info == nil {
+		return errors.New("invalid task probe context")
+	}
+	probeContext, cancel := context.WithTimeout(c.Request.Context(), taskAvailabilityProbeTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(probeContext, method, endpoint, http.NoBody)
+	if err != nil {
+		return fmt.Errorf("new probe request failed: %w", err)
+	}
+	if setup != nil {
+		if err := setup(req); err != nil {
+			return fmt.Errorf("setup probe request header failed: %w", err)
+		}
+	}
+	headerOverride, err := processHeaderOverride(info, c)
+	if err != nil {
+		return err
+	}
+	applyHeaderOverrideToRequest(req, headerOverride)
+
+	probeGinContext := c.Copy()
+	probeGinContext.Request = c.Request.Clone(probeContext)
+	probeGinContext.Request.Body = http.NoBody
+	resp, err := doRequest(probeGinContext, req, info)
+	if err != nil {
+		return fmt.Errorf("probe request failed: %w", err)
+	}
+	if resp == nil {
+		return errors.New("probe request returned empty response")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+		return nil
+	}
+	if allowUnsupported && (resp.StatusCode == http.StatusNotFound ||
+		resp.StatusCode == http.StatusMethodNotAllowed ||
+		resp.StatusCode == http.StatusNotImplemented ||
+		(resp.StatusCode >= http.StatusBadRequest && resp.StatusCode < http.StatusInternalServerError &&
+			resp.StatusCode != http.StatusUnauthorized &&
+			resp.StatusCode != http.StatusForbidden &&
+			resp.StatusCode != http.StatusTooManyRequests)) {
+		return ErrTaskAvailabilityProbeUnsupported
+	}
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
+	return fmt.Errorf("upstream availability probe returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+}
+
+// ErrTaskAvailabilityProbeUnsupported means that the provider does not expose
+// a safe, non-creating endpoint for this adaptor. Callers should continue with
+// the real task request in this case; the sentinel is not a provider failure.
+var ErrTaskAvailabilityProbeUnsupported = errors.New("task availability probe unsupported")
+
+// DoTaskAvailabilityHeadProbe performs a best-effort HEAD probe against a task
+// endpoint. It is only a reachability/authentication check: providers that do
+// not support HEAD are reported as unsupported, never as an unavailable task
+// channel. HEAD has no request body and therefore cannot create a task.
+func DoTaskAvailabilityHeadProbe(a TaskAdaptor, c *gin.Context, info *common.RelayInfo, endpoint string) error {
+	if a == nil || c == nil || c.Request == nil || info == nil {
+		return errors.New("invalid task probe context")
+	}
+	probeContext, cancel := context.WithTimeout(c.Request.Context(), taskAvailabilityProbeTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(probeContext, http.MethodHead, endpoint, http.NoBody)
+	if err != nil {
+		return fmt.Errorf("new task availability probe request failed: %w", err)
+	}
+	if err := a.BuildRequestHeader(c, req, info); err != nil {
+		return fmt.Errorf("setup task availability probe header failed: %w", err)
+	}
+	headerOverride, err := processHeaderOverride(info, c)
+	if err != nil {
+		return err
+	}
+	applyHeaderOverrideToRequest(req, headerOverride)
+
+	probeGinContext := c.Copy()
+	probeGinContext.Request = c.Request.Clone(probeContext)
+	probeGinContext.Request.Body = http.NoBody
+	resp, err := doRequest(probeGinContext, req, info)
+	if err != nil {
+		return fmt.Errorf("task availability probe request failed: %w", err)
+	}
+	if resp == nil {
+		return errors.New("task availability probe returned empty response")
+	}
+	defer resp.Body.Close()
+
+	switch {
+	case resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices:
+		return nil
+	case resp.StatusCode == http.StatusNotFound,
+		resp.StatusCode == http.StatusMethodNotAllowed,
+		resp.StatusCode == http.StatusNotImplemented:
+		return ErrTaskAvailabilityProbeUnsupported
+	case resp.StatusCode == http.StatusUnauthorized,
+		resp.StatusCode == http.StatusForbidden,
+		resp.StatusCode == http.StatusTooManyRequests,
+		resp.StatusCode >= http.StatusInternalServerError:
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
+		return fmt.Errorf("upstream task availability probe returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	default:
+		// 4xx responses such as 400/422 mean the endpoint is reachable but
+		// rejected the body-less HEAD request. No task was created, so allow
+		// the real request to decide whether the submitted payload is valid.
+		return nil
+	}
+}
+
+// ProbeTaskAvailability invokes a documented adaptor probe when available and
+// otherwise falls back to a side-effect-free HEAD request against the task
+// endpoint. Unsupported HEAD endpoints are intentionally non-blocking.
+func ProbeTaskAvailability(a TaskAdaptor, c *gin.Context, info *common.RelayInfo) error {
+	if probe, ok := a.(TaskAvailabilityProbe); ok {
+		return probe.ProbeAvailability(c, info)
+	}
+	endpoint, err := a.BuildRequestURL(info)
+	if err != nil {
+		return err
+	}
+	return DoTaskAvailabilityHeadProbe(a, c, info, endpoint)
 }

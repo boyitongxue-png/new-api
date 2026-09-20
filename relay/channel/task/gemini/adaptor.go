@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -64,6 +65,17 @@ func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, info
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("x-goog-api-key", a.apiKey)
 	return nil
+}
+
+func (a *TaskAdaptor) ProbeAvailability(c *gin.Context, info *relaycommon.RelayInfo) error {
+	modelName := url.PathEscape(info.UpstreamModelName)
+	version := model_setting.GetGeminiVersionSetting(info.UpstreamModelName)
+	endpoint := fmt.Sprintf("%s/%s/models/%s", strings.TrimRight(a.baseURL, "/"), version, modelName)
+	return channel.DoTaskAvailabilityProbe(c, info, http.MethodGet, endpoint, func(req *http.Request) error {
+		req.Header.Set("x-goog-api-key", a.apiKey)
+		req.Header.Set("Accept", "application/json")
+		return nil
+	})
 }
 
 // BuildRequestBody converts request into the Veo predictLongRunning format.

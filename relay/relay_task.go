@@ -180,6 +180,18 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	if err := helper.ModelMappedHelper(c, info, nil); err != nil {
 		return nil, service.TaskErrorWrapperLocal(err, "model_mapping_failed", http.StatusBadRequest)
 	}
+
+	// Probe video channels before billing and task creation. Adaptors with a
+	// documented read-only endpoint use it; other providers get a side-effect-
+	// free HEAD reachability check. An unsupported probe must not block the real
+	// request. The async task pipeline also serves Suno music, which is excluded.
+	if constant.IsVideoTaskPlatform(platform) {
+		if err := channel.ProbeTaskAvailability(adaptor, c, info); err != nil &&
+			!errors.Is(err, channel.ErrTaskAvailabilityProbeUnsupported) {
+			return nil, service.TaskErrorWrapper(err, "video_channel_unavailable", http.StatusBadGateway)
+		}
+	}
+
 	if err := helper.ResolveTaskBillingPrice(c, info); err != nil {
 		return nil, service.TaskErrorWrapper(err, "task_billing_price_error", http.StatusBadRequest)
 	}
