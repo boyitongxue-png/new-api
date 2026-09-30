@@ -14,7 +14,7 @@
 #   - 不在 KEEP_IDS 白名单中
 set -euo pipefail
 
-BASE_URL="${LMZH_BASE_URL:-https://api.lmzh.cc}"
+BASE_URL="${LMZH_BASE_URL:-https://ai60.top}"
 OUT="${BOT_USERS_FILE:-/tmp/bot_users.json}"
 ALL="${ALL_USERS_FILE:-/tmp/all_users.json}"
 KEEP_IDS="${KEEP_IDS:-155,156}"

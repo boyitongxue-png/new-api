@@ -254,7 +254,7 @@ export function Footer(props: FooterProps) {
             <ProjectAttribution
               currentYear={currentYear}
               brandName='API MIX'
-              href='https://api.lmzh.cc'
+              href='https://ai60.top'
               showSuffix={false}
             />
           </div>

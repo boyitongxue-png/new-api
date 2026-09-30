@@ -58,6 +58,9 @@ func ValidateModelCostJSON(raw string) error {
 	if err := common.UnmarshalJsonStr(raw, &config); err != nil {
 		return fmt.Errorf("ModelCost must be a JSON object: %w", err)
 	}
+	if config == nil {
+		return fmt.Errorf("ModelCost must be a JSON object")
+	}
 	for key, cost := range config {
 		if strings.TrimSpace(key) == "" {
 			return fmt.Errorf("ModelCost contains an empty model key")

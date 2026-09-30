@@ -25,6 +25,37 @@ func TestValidateScheduledDiscountJSONString(t *testing.T) {
 	assert.NoError(t, ValidateScheduledDiscountJSONString(`{"m":{"enabled":false}}`))
 }
 
+func TestValidateBillingModeJSONString(t *testing.T) {
+	assert.NoError(t, ValidateBillingModeJSONString(`{"video":"per-second","chat":"ratio"}`))
+	assert.Error(t, ValidateBillingModeJSONString(`{"video":"per-minute"}`))
+	assert.Error(t, ValidateBillingModeJSONString(`{"":"per-second"}`))
+	assert.Error(t, ValidateBillingModeJSONString(`null`))
+}
+
+func TestValidateBillingExprJSONString(t *testing.T) {
+	assert.NoError(t, ValidateBillingExprJSONString(`{"tiered":"tier(\"base\", p * 2)"}`))
+	assert.Error(t, ValidateBillingExprJSONString(`{"tiered":"p **"}`))
+	assert.Error(t, ValidateBillingExprJSONString(`{"tiered":""}`))
+}
+
+func TestValidateTaskBillingPricingJSONString(t *testing.T) {
+	valid := `{"video":{"mode":"per-second","default_price":0.01,"resolution_prices":{"720p":0.02}}}`
+	assert.NoError(t, ValidateTaskBillingPricingJSONString(valid))
+
+	for name, value := range map[string]string{
+		"invalid mode":          `{"video":{"mode":"ratio","default_price":0.01}}`,
+		"negative price":        `{"video":{"mode":"per-request","default_price":-1}}`,
+		"oversized price":       `{"video":{"mode":"per-request","default_price":1000000001}}`,
+		"null resolution price": `{"video":{"mode":"per-request","resolution_prices":{"720p":null}}}`,
+		"missing prices":        `{"video":{"mode":"per-request"}}`,
+		"empty model":           `{"":{"mode":"per-request","default_price":0.01}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Error(t, ValidateTaskBillingPricingJSONString(value))
+		})
+	}
+}
+
 func TestScheduledDiscountMultiplierUsesBeijingTimeAndSupportsMidnight(t *testing.T) {
 	saved := billingSetting.ScheduledDiscount
 	billingSetting.ScheduledDiscount = map[string]ScheduledDiscountConfig{

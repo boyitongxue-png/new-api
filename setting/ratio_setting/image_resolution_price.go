@@ -1,8 +1,8 @@
 package ratio_setting
 
 import (
+	"encoding/json"
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -37,7 +37,7 @@ func (p ImageResolutionPrice) PriceForTier(tier string) (float64, bool) {
 var imageResolutionPriceMap = types.NewRWMap[string, ImageResolutionPrice]()
 
 func parseImageResolutionPriceJSON(jsonStr string) (map[string]ImageResolutionPrice, error) {
-	var raw map[string]map[string]float64
+	var raw map[string]map[string]json.RawMessage
 	if err := common.UnmarshalJsonStr(jsonStr, &raw); err != nil {
 		return nil, err
 	}
@@ -53,12 +53,19 @@ func parseImageResolutionPriceJSON(jsonStr string) (map[string]ImageResolutionPr
 
 		prices := ImageResolutionPrice{}
 		for _, tier := range []string{ImageResolutionTier1K, ImageResolutionTier2K, ImageResolutionTier4K} {
-			price, ok := tiers[tier]
+			rawPrice, ok := tiers[tier]
 			if !ok {
 				return nil, fmt.Errorf("model %s is missing %s price", modelName, tier)
 			}
-			if price < 0 || math.IsNaN(price) || math.IsInf(price, 0) {
-				return nil, fmt.Errorf("model %s %s price must be a finite non-negative number", modelName, tier)
+			if common.GetJsonType(rawPrice) != "number" {
+				return nil, fmt.Errorf("model %s %s price must be a JSON number", modelName, tier)
+			}
+			var price float64
+			if err := common.Unmarshal(rawPrice, &price); err != nil {
+				return nil, fmt.Errorf("model %s %s price must be a JSON number: %w", modelName, tier, err)
+			}
+			if err := validatePricingValue(fmt.Sprintf("model %s %s price", modelName, tier), price); err != nil {
+				return nil, err
 			}
 			switch tier {
 			case ImageResolutionTier1K:

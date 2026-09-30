@@ -216,8 +216,41 @@ func validateOptionValue(key string, value string) error {
 	if key == "MaxTokenAutoGroups" {
 		return setting.ValidateMaxTokenAutoGroups(value)
 	}
+	if key == "ModelCost" {
+		return ValidateModelCostJSON(value)
+	}
 	if key == "billing_setting."+billing_setting.ScheduledDiscountField {
 		return billing_setting.ValidateScheduledDiscountJSONString(value)
+	}
+	switch key {
+	case "ModelRatio":
+		return ratio_setting.ValidateModelRatioJSONString(value)
+	case "ModelPrice":
+		return ratio_setting.ValidateModelPriceJSONString(value)
+	case "CompletionRatio":
+		return ratio_setting.ValidateCompletionRatioJSONString(value)
+	case "CacheRatio":
+		return ratio_setting.ValidateCacheRatioJSONString(value)
+	case "CreateCacheRatio":
+		return ratio_setting.ValidateCreateCacheRatioJSONString(value)
+	case "ImageRatio":
+		return ratio_setting.ValidateImageRatioJSONString(value)
+	case "ImageResolutionPrice":
+		return ratio_setting.ValidateImageResolutionPriceJSONString(value)
+	case "AudioRatio":
+		return ratio_setting.ValidateAudioRatioJSONString(value)
+	case "AudioCompletionRatio":
+		return ratio_setting.ValidateAudioCompletionRatioJSONString(value)
+	case "GroupRatio":
+		return ratio_setting.ValidateGroupRatioJSONString(value)
+	case "GroupGroupRatio":
+		return ratio_setting.ValidateGroupGroupRatioJSONString(value)
+	case "billing_setting." + billing_setting.BillingModeField:
+		return billing_setting.ValidateBillingModeJSONString(value)
+	case "billing_setting." + billing_setting.BillingExprField:
+		return billing_setting.ValidateBillingExprJSONString(value)
+	case "billing_setting." + billing_setting.TaskBillingPricingField:
+		return billing_setting.ValidateTaskBillingPricingJSONString(value)
 	}
 	return nil
 }
@@ -637,6 +670,10 @@ func handleConfigUpdate(key, value string) bool {
 	cfg := config.GlobalConfig.Get(configName)
 	if cfg == nil {
 		return false // 未注册的配置
+	}
+	if err := validateOptionValue(key, value); err != nil {
+		common.SysLog("拒绝无效配置 " + key + ": " + err.Error())
+		return true
 	}
 
 	// 更新配置

@@ -1,6 +1,7 @@
 package billing_setting
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
@@ -24,6 +25,7 @@ const (
 	TaskBillingPricingField   = "task_billing_pricing"
 	ScheduledDiscountField    = "scheduled_discount"
 	ScheduledDiscountRatioKey = "scheduled_discount"
+	MaxTaskBillingPrice       = 1_000_000_000.0
 )
 
 const (
@@ -159,12 +161,122 @@ func ValidateScheduledDiscountJSONString(value string) error {
 	if err := common.UnmarshalJsonStr(value, &configs); err != nil {
 		return fmt.Errorf("scheduled discount must be a JSON object: %w", err)
 	}
+	if configs == nil {
+		return fmt.Errorf("scheduled discount must be a JSON object")
+	}
 	for model, config := range configs {
 		if strings.TrimSpace(model) == "" {
 			return fmt.Errorf("scheduled discount model name cannot be empty")
 		}
 		if err := validateScheduledDiscountConfig(config); err != nil {
 			return fmt.Errorf("scheduled discount for model %s: %w", model, err)
+		}
+	}
+	return nil
+}
+
+// ValidateBillingModeJSONString validates the billing mode map before it is
+// persisted or applied to the live configuration.
+func ValidateBillingModeJSONString(value string) error {
+	var modes map[string]string
+	if err := common.UnmarshalJsonStr(value, &modes); err != nil {
+		return fmt.Errorf("billing mode must be a JSON object: %w", err)
+	}
+	if modes == nil {
+		return fmt.Errorf("billing mode must be a JSON object")
+	}
+	for model, mode := range modes {
+		if strings.TrimSpace(model) == "" {
+			return fmt.Errorf("billing mode model name cannot be empty")
+		}
+		switch mode {
+		case BillingModeRatio, BillingModeTieredExpr, BillingModePerRequest, BillingModePerSecond:
+		default:
+			return fmt.Errorf("billing mode for model %s is invalid: %q", model, mode)
+		}
+	}
+	return nil
+}
+
+// ValidateBillingExprJSONString validates and compiles each billing
+// expression so malformed syntax cannot enter the live pricing settings.
+func ValidateBillingExprJSONString(value string) error {
+	var expressions map[string]string
+	if err := common.UnmarshalJsonStr(value, &expressions); err != nil {
+		return fmt.Errorf("billing expression must be a JSON object: %w", err)
+	}
+	if expressions == nil {
+		return fmt.Errorf("billing expression must be a JSON object")
+	}
+	for model, expression := range expressions {
+		if strings.TrimSpace(model) == "" {
+			return fmt.Errorf("billing expression model name cannot be empty")
+		}
+		if strings.TrimSpace(expression) == "" {
+			return fmt.Errorf("billing expression for model %s cannot be empty", model)
+		}
+		if _, err := billingexpr.CompileFromCache(expression); err != nil {
+			return fmt.Errorf("billing expression for model %s: %w", model, err)
+		}
+	}
+	return nil
+}
+
+// ValidateTaskBillingPricingJSONString validates asynchronous task price
+// tables, including all resolution-specific prices.
+func ValidateTaskBillingPricingJSONString(value string) error {
+	var rawPrices map[string]json.RawMessage
+	var prices map[string]TaskBillingPriceConfig
+	if err := common.UnmarshalJsonStr(value, &prices); err != nil {
+		return fmt.Errorf("task billing pricing must be a JSON object: %w", err)
+	}
+	if prices == nil {
+		return fmt.Errorf("task billing pricing must be a JSON object")
+	}
+	if err := common.UnmarshalJsonStr(value, &rawPrices); err != nil {
+		return fmt.Errorf("task billing pricing must be a JSON object: %w", err)
+	}
+	for model, config := range prices {
+		if strings.TrimSpace(model) == "" {
+			return fmt.Errorf("task billing pricing model name cannot be empty")
+		}
+		if config.Mode != BillingModePerRequest && config.Mode != BillingModePerSecond {
+			return fmt.Errorf("task billing pricing for model %s has invalid mode %q", model, config.Mode)
+		}
+		if config.DefaultPrice == nil && len(config.ResolutionPrices) == 0 {
+			return fmt.Errorf("task billing pricing for model %s must configure a default or resolution price", model)
+		}
+		if config.DefaultPrice != nil {
+			if err := validateTaskBillingPrice(*config.DefaultPrice); err != nil {
+				return fmt.Errorf("task billing pricing for model %s default price: %w", model, err)
+			}
+		}
+		var rawConfig map[string]json.RawMessage
+		if err := common.Unmarshal(rawPrices[model], &rawConfig); err != nil || rawConfig == nil {
+			return fmt.Errorf("task billing pricing for model %s must be a JSON object", model)
+		}
+		rawResolutionPrices, hasResolutionPrices := rawConfig["resolution_prices"]
+		if hasResolutionPrices && common.GetJsonType(rawResolutionPrices) == "null" {
+			return fmt.Errorf("task billing pricing for model %s resolution prices must be a JSON object", model)
+		}
+		if hasResolutionPrices {
+			var rawResolutions map[string]json.RawMessage
+			if err := common.Unmarshal(rawResolutionPrices, &rawResolutions); err != nil || rawResolutions == nil {
+				return fmt.Errorf("task billing pricing for model %s resolution prices must be a JSON object", model)
+			}
+			for resolution, rawPrice := range rawResolutions {
+				if common.GetJsonType(rawPrice) != "number" {
+					return fmt.Errorf("task billing pricing for model %s resolution %s must be a JSON number", model, resolution)
+				}
+			}
+		}
+		for resolution, price := range config.ResolutionPrices {
+			if strings.TrimSpace(resolution) == "" {
+				return fmt.Errorf("task billing pricing for model %s has an empty resolution", model)
+			}
+			if err := validateTaskBillingPrice(price); err != nil {
+				return fmt.Errorf("task billing pricing for model %s resolution %s: %w", model, resolution, err)
+			}
 		}
 	}
 	return nil
@@ -413,6 +525,9 @@ func cloneTaskBillingPriceConfig(config TaskBillingPriceConfig) TaskBillingPrice
 func validateTaskBillingPrice(price float64) error {
 	if math.IsNaN(price) || math.IsInf(price, 0) || price < 0 {
 		return fmt.Errorf("task price must be a finite non-negative number")
+	}
+	if price > MaxTaskBillingPrice {
+		return fmt.Errorf("task price must not exceed %g", MaxTaskBillingPrice)
 	}
 	return nil
 }
