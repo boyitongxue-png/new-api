@@ -25,6 +25,14 @@ For commercial licensing, please contact support@quantumnous.com
 
 export const THEME_PRESETS = [
   {
+    // API MIX brand: deep warm black canvas with a single acid-lime accent
+    // (#C8FF2E, always paired with black text). Light mode swaps to a warm
+    // off-white canvas and an olive primary that keeps text contrast on white.
+    value: 'apimix',
+    name: 'API MIX',
+    swatches: ['#0B0B0A', '#C8FF2E'],
+  },
+  {
     value: 'default',
     name: 'Default',
     swatches: ['oklch(0.72 0.18 250)', 'oklch(0.7 0.12 280)'],
@@ -116,7 +124,7 @@ export type ThemeCustomization = {
 }
 
 export const DEFAULT_THEME_CUSTOMIZATION: ThemeCustomization = {
-  preset: 'default',
+  preset: 'apimix',
   font: 'default',
   radius: 'default',
   scale: 'default',
@@ -176,6 +184,7 @@ export const THEME_COOKIE_KEYS = {
 export const PRESET_DEFAULT_FONT: Partial<
   Record<ThemePreset, ResolvedThemeFont>
 > = {
+  apimix: 'sans',
   default: 'sans',
   anthropic: 'serif',
 }

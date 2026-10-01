@@ -426,10 +426,12 @@ For commercial licensing, please contact support@quantumnous.com
  *   - `anthropic`: warm cream surfaces are a brand choice, NOT a primary-mix
  *     derivation (the Anthropic system deliberately uses warm neutrals for
  *     cards/borders rather than tinting them with the clay accent).
- *   - `simple-large`: keeps intentionally neutral, high-contrast surfaces. */
+ *   - `simple-large`: keeps intentionally neutral, high-contrast surfaces.
+ *   - `apimix`: brand-defined warm black / off-white surfaces; lime is an
+ *     accent only and must never tint cards or borders. */
 [data-theme-preset]:not([data-theme-preset='default']):not(
-  [data-theme-preset='anthropic']
-):not([data-theme-preset='simple-large']) {
+    [data-theme-preset='anthropic']
+  ):not([data-theme-preset='simple-large']):not([data-theme-preset='apimix']) {
   --card: color-mix(in oklch, var(--primary) 3%, var(--background));
   --popover: color-mix(in oklch, var(--primary) 5%, var(--background));
   --muted: color-mix(in oklch, var(--primary) 7%, var(--background));
@@ -454,7 +456,7 @@ For commercial licensing, please contact support@quantumnous.com
 .dark
   [data-theme-preset]:not([data-theme-preset='default']):not(
     [data-theme-preset='anthropic']
-  ):not([data-theme-preset='simple-large']) {
+  ):not([data-theme-preset='simple-large']):not([data-theme-preset='apimix']) {
   --card: color-mix(in oklch, var(--primary) 8%, var(--background));
   --popover: color-mix(in oklch, var(--primary) 12%, var(--background));
   --muted: color-mix(in oklch, var(--primary) 12%, var(--background));
@@ -612,6 +614,139 @@ For commercial licensing, please contact support@quantumnous.com
   --skeleton-highlight: oklch(0.41 0.004 60);
 }
 
+/* ── API MIX ──────────────────────────────────────────────────────────── */
+/*
+ * The API MIX brand: a deep warm-black canvas, off-white ink, hairline
+ * borders and ONE acid-lime accent (#C8FF2E) that always carries black text.
+ * Inner pages are tools — lime is reserved for primary actions, the current /
+ * selected state and balance / top-up affordances.
+ *
+ * Light mode keeps the identity on a warm off-white canvas. Lime cannot be
+ * used as text on white (contrast ≈ 1.2:1), so `--primary` becomes an olive
+ * (#5B7A00, 4.9:1 with white text, ≈4.6:1 as text on the canvas) while brand
+ * call-to-action fills keep lime + black via the `--brand-*` tokens below
+ * (consumed by `.brand-fill` / `.text-brand` in apimix.css).
+ *
+ * Opted out of the semantic surface bridge above so surfaces stay neutral.
+ */
+[data-theme-preset='apimix'] {
+  --background: #f6f6f1;
+  --foreground: #121210;
+  --card: #ffffff;
+  --card-foreground: #121210;
+  --popover: #ffffff;
+  --popover-foreground: #121210;
+
+  --primary: #5b7a00;
+  --primary-foreground: #ffffff;
+  --secondary: #ecece5;
+  --secondary-foreground: #121210;
+  --muted: #efefe9;
+  --muted-foreground: #5e5e57;
+  --accent: #e9e9e1;
+  --accent-foreground: #121210;
+
+  --destructive: oklch(0.55 0.2 27);
+  --destructive-foreground: #ffffff;
+  --success: #2e8a57;
+  --success-foreground: #ffffff;
+  --warning: #d98e04;
+  --warning-foreground: #121210;
+  --info: #2f73b8;
+  --info-foreground: #ffffff;
+  --neutral: #5e5e57;
+  --neutral-foreground: #ffffff;
+
+  --border: #e2e2da;
+  --input: #d4d4cb;
+  --ring: #5b7a00;
+
+  --chart-1: #6f9400;
+  --chart-2: #2e8a57;
+  --chart-3: #2f73b8;
+  --chart-4: #d98e04;
+  --chart-5: #7b61d9;
+
+  --sidebar: #efefe8;
+  --sidebar-foreground: #121210;
+  --sidebar-primary: #5b7a00;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e4e4db;
+  --sidebar-accent-foreground: #121210;
+  --sidebar-border: #e2e2da;
+  --sidebar-ring: #5b7a00;
+
+  --skeleton-base: #e9e9e2;
+  --skeleton-highlight: #f3f3ee;
+
+  /* Brand tokens (no equivalent in other presets — consumers fall back to
+   * --primary / --primary-foreground when these are undefined). */
+  --brand-lime: #c8ff2e;
+  --brand-lime-hover: #d4ff55;
+  --brand-on-lime: #0b0b0a;
+  --brand-text: #5b7a00;
+  --brand-warn: #9a5b00;
+  --brand-warn-bg: rgba(217, 142, 4, 0.1);
+  --brand-warn-line: rgba(217, 142, 4, 0.45);
+
+  --radius: 0.75rem;
+}
+.dark [data-theme-preset='apimix'] {
+  --background: #0b0b0a;
+  --foreground: #edede8;
+  --card: #131311;
+  --card-foreground: #edede8;
+  --popover: #191917;
+  --popover-foreground: #edede8;
+
+  --primary: #c8ff2e;
+  --primary-foreground: #0b0b0a;
+  --secondary: #1e1e1b;
+  --secondary-foreground: #edede8;
+  --muted: #191917;
+  --muted-foreground: #a6a6a0;
+  --accent: #22221f;
+  --accent-foreground: #edede8;
+
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: #0b0b0a;
+  --success: #6fd3a0;
+  --success-foreground: #0b0b0a;
+  --warning: #ffb547;
+  --warning-foreground: #0b0b0a;
+  --info: #7cc4ff;
+  --info-foreground: #0b0b0a;
+  --neutral: #a6a6a0;
+  --neutral-foreground: #0b0b0a;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.16);
+  --ring: #c8ff2e;
+
+  --chart-1: #c8ff2e;
+  --chart-2: #6fd3a0;
+  --chart-3: #7cc4ff;
+  --chart-4: #ffb547;
+  --chart-5: #b69cff;
+
+  --sidebar: #0e0e0d;
+  --sidebar-foreground: #edede8;
+  --sidebar-primary: #c8ff2e;
+  --sidebar-primary-foreground: #0b0b0a;
+  --sidebar-accent: #1c1c1a;
+  --sidebar-accent-foreground: #edede8;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #c8ff2e;
+
+  --skeleton-base: #1a1a18;
+  --skeleton-highlight: #262622;
+
+  --brand-text: #c8ff2e;
+  --brand-warn: #ffb547;
+  --brand-warn-bg: rgba(255, 181, 71, 0.08);
+  --brand-warn-line: rgba(255, 181, 71, 0.36);
+}
+
 /* ── Font axis ────────────────────────────────────────────────────────────
  * Mirrors how `data-theme-radius` overrides a preset's default radius:
  * presets may set `--font-body` (Anthropic → serif), and the user's
@@ -626,6 +761,11 @@ For commercial licensing, please contact support@quantumnous.com
 }
 [data-theme-font='serif'] {
   --font-body: var(--font-serif);
+}
+/* API MIX pairs the sans axis with its own grotesk + CJK stack. Compound
+ * selector (0,2,0) so it wins over the plain `[data-theme-font='sans']`. */
+[data-theme-preset='apimix'][data-theme-font='sans'] {
+  --font-body: var(--font-apimix);
 }
 
 /* ── Serif typography refinements ────────────────────────────────────────

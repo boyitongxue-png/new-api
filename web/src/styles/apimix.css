@@ -1,0 +1,66 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+/*
+ * API MIX brand layer.
+ *
+ * - Font stacks used by the `apimix` theme preset (see theme-presets.css) and
+ *   by the branded public surfaces (home, public header, auth split layout).
+ *   Space Grotesk / Noto Sans SC / JetBrains Mono are requested non-blocking
+ *   from index.html; every stack degrades to local CJK + system fonts.
+ * - `.brand-fill` / `.text-brand`: lime call-to-action fill and brand text.
+ *   They read the `--brand-*` tokens that only the `apimix` preset defines and
+ *   fall back to `--primary` so every other preset keeps working.
+ */
+:root {
+  --font-apimix:
+    'Space Grotesk', 'Noto Sans SC', 'Noto Sans CJK SC', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Public Sans', system-ui, sans-serif;
+  --font-apimix-cn:
+    'Noto Sans SC', 'Noto Sans CJK SC', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', system-ui, sans-serif;
+  --font-apimix-mono:
+    'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas,
+    'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
+  --ease-apimix-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-apimix-inout: cubic-bezier(0.77, 0, 0.18, 1);
+  --ease-apimix-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@layer components {
+  .brand-fill {
+    background-color: var(--brand-lime, var(--primary));
+    color: var(--brand-on-lime, var(--primary-foreground));
+  }
+  .brand-fill:hover {
+    background-color: var(
+      --brand-lime-hover,
+      color-mix(in oklch, var(--primary) 88%, var(--background))
+    );
+  }
+  .text-brand {
+    color: var(--brand-text, var(--primary));
+  }
+  .font-apimix-cn {
+    font-family: var(--font-apimix-cn);
+    font-feature-settings: 'palt';
+  }
+  .font-apimix-mono {
+    font-family: var(--font-apimix-mono);
+  }
+}
