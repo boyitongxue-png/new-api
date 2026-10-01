@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useTranslation } from 'react-i18next'
 
-import { StatusBadge, type StatusVariant } from '@/components/status-badge'
+import { cn } from '@/lib/utils'
 
 import { isDynamicPricingModel } from '../lib/dynamic-price'
 import { isTokenBasedModel } from '../lib/model-helpers'
@@ -33,35 +33,51 @@ interface ModelBillingModeBadgeProps {
   className?: string
 }
 
+/**
+ * Restrained pill treatments, one per billing family:
+ * - `outline`: metered by tokens (the common case)
+ * - `dashed`: flat per request / per second
+ * - `filled`: pricing that varies with the request (dynamic, resolution)
+ */
+type BillingTagStyle = 'outline' | 'dashed' | 'filled'
+
+const BILLING_TAG_STYLE_CLASSES: Record<BillingTagStyle, string> = {
+  outline: 'border-border text-foreground/85',
+  dashed: 'border-dashed border-foreground/30 text-muted-foreground',
+  filled: 'border-transparent bg-primary/15 text-foreground',
+}
+
 export function ModelBillingModeBadge(props: ModelBillingModeBadgeProps) {
   const { t } = useTranslation()
   let label = t('Per Request')
-  let variant: StatusVariant = 'purple'
+  let tagStyle: BillingTagStyle = 'dashed'
 
   if (hasTaskResolutionPricing(props.model)) {
     label = t('Video resolution pricing')
-    variant = 'cyan'
+    tagStyle = 'filled'
   } else if (hasImageResolutionPricing(props.model)) {
     label = t('Image resolution pricing')
-    variant = 'cyan'
+    tagStyle = 'filled'
   } else if (props.model.billing_mode === 'per-second') {
     label = t('Per second')
-    variant = 'info'
+    tagStyle = 'dashed'
   } else if (isDynamicPricingModel(props.model)) {
     label = t('Dynamic Pricing')
-    variant = 'warning'
+    tagStyle = 'filled'
   } else if (isTokenBasedModel(props.model)) {
     label = t('Token-based')
-    variant = 'info'
+    tagStyle = 'outline'
   }
 
   return (
-    <StatusBadge
-      label={label}
-      variant={variant}
-      copyable={false}
-      size='sm'
-      className={props.className}
-    />
+    <span
+      className={cn(
+        'inline-flex h-5 items-center rounded-full border px-2 text-[11px] leading-none font-medium whitespace-nowrap',
+        BILLING_TAG_STYLE_CLASSES[tagStyle],
+        props.className
+      )}
+    >
+      {label}
+    </span>
   )
 }

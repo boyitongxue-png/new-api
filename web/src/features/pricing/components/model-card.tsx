@@ -293,8 +293,10 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   return (
     <div
       className={cn(
-        'group relative flex flex-col rounded-xl border p-3 transition-colors sm:p-5',
-        'hover:bg-muted/20'
+        'group relative flex flex-col overflow-hidden rounded-xl border p-3 transition-colors sm:p-5',
+        'hover:bg-muted/20 hover:border-foreground/20',
+        // Brand accent: a lime top edge sweeps in on hover / keyboard focus.
+        'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:origin-left before:scale-x-0 before:bg-[var(--brand-lime,var(--primary))] before:transition-transform before:duration-500 before:ease-[cubic-bezier(0.77,0,0.18,1)] focus-within:before:scale-x-100 hover:before:scale-x-100 motion-reduce:before:transition-none'
       )}
     >
       {/* Header: icon + name + price + actions */}
