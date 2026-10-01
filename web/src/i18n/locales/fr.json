@@ -5529,6 +5529,7 @@
     "Pay now": "Payer maintenant",
     "Pay {{amount}}": "Payer {{amount}}",
     "Save {{amount}}": "Économisez {{amount}}",
-    "Online top-up unavailable": "Recharge en ligne indisponible"
+    "Online top-up unavailable": "Recharge en ligne indisponible",
+    "Sign in to manage API keys, track usage and top up online.": "Connectez-vous pour gérer vos clés API, suivre votre consommation et recharger en ligne."
   }
 }

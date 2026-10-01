@@ -5529,6 +5529,7 @@
     "Pay now": "立即支付",
     "Pay {{amount}}": "應付 {{amount}}",
     "Save {{amount}}": "節省 {{amount}}",
-    "Online top-up unavailable": "線上儲值暫不可用"
+    "Online top-up unavailable": "線上儲值暫不可用",
+    "Sign in to manage API keys, track usage and top up online.": "登入後即可管理 API 金鑰、查看用量，並線上儲值額度。"
   }
 }

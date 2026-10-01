@@ -1087,3 +1087,51 @@ For commercial licensing, please contact support@quantumnous.com
     display: none;
   }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+ * Auth split layout brand panel (features/auth/auth-layout.tsx).
+ * ═════════════════════════════════════════════════════════════════════════ */
+.amx-auth-eyebrow {
+  font-family: var(--font-apimix-mono);
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  margin-bottom: clamp(18px, 2.4vw, 28px);
+}
+.amx-auth-title {
+  font-family: var(--font-apimix-cn);
+  font-feature-settings: 'palt';
+  font-weight: 900;
+  font-size: clamp(38px, 4.6vw, 68px);
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+.amx-auth-hl {
+  display: inline-block;
+  padding: 0 0.09em;
+  margin: 0 0.05em;
+  background: #c8ff2e;
+  color: #0b0b0a;
+  line-height: 1.1;
+  animation: amx-wipe 0.62s var(--ease-apimix-inout) 0.2s both;
+}
+.amx-auth-mix {
+  position: absolute;
+  z-index: -1;
+  right: -0.06em;
+  bottom: -0.16em;
+  font-family: 'Space Grotesk', 'Noto Sans CJK SC', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(180px, 30vw, 440px);
+  line-height: 1;
+  letter-spacing: -0.06em;
+  color: transparent;
+  -webkit-text-stroke: 1.2px color-mix(in oklch, var(--foreground) 9%, transparent);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .amx-auth-hl {
+    animation: none;
+  }
+}

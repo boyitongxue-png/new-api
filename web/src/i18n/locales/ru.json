@@ -5529,6 +5529,7 @@
     "Pay now": "Оплатить",
     "Pay {{amount}}": "К оплате {{amount}}",
     "Save {{amount}}": "Экономия {{amount}}",
-    "Online top-up unavailable": "Онлайн-пополнение недоступно"
+    "Online top-up unavailable": "Онлайн-пополнение недоступно",
+    "Sign in to manage API keys, track usage and top up online.": "Войдите, чтобы управлять API-ключами, следить за расходом и пополнять баланс онлайн."
   }
 }

@@ -5529,6 +5529,7 @@
     "Pay now": "Pay now",
     "Pay {{amount}}": "Pay {{amount}}",
     "Save {{amount}}": "Save {{amount}}",
-    "Online top-up unavailable": "Online top-up unavailable"
+    "Online top-up unavailable": "Online top-up unavailable",
+    "Sign in to manage API keys, track usage and top up online.": "Sign in to manage API keys, track usage and top up online."
   }
 }

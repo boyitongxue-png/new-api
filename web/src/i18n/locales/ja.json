@@ -5529,6 +5529,7 @@
     "Pay now": "今すぐ支払う",
     "Pay {{amount}}": "支払額 {{amount}}",
     "Save {{amount}}": "{{amount}} お得",
-    "Online top-up unavailable": "オンラインチャージは利用できません"
+    "Online top-up unavailable": "オンラインチャージは利用できません",
+    "Sign in to manage API keys, track usage and top up online.": "ログインして API キーの管理、使用量の確認、オンラインチャージができます。"
   }
 }

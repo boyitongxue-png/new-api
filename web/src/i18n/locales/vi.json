@@ -5529,6 +5529,7 @@
     "Pay now": "Thanh toán ngay",
     "Pay {{amount}}": "Thanh toán {{amount}}",
     "Save {{amount}}": "Tiết kiệm {{amount}}",
-    "Online top-up unavailable": "Nạp tiền trực tuyến không khả dụng"
+    "Online top-up unavailable": "Nạp tiền trực tuyến không khả dụng",
+    "Sign in to manage API keys, track usage and top up online.": "Đăng nhập để quản lý khóa API, theo dõi mức sử dụng và nạp tiền trực tuyến."
   }
 }
