@@ -5525,6 +5525,10 @@
     "Top up": "Recharger",
     "Top up & Wallet": "Recharge et portefeuille",
     "Balance: {{balance}}. Open wallet": "Solde : {{balance}}. Ouvrir le portefeuille",
-    "Low balance: {{balance}}. Open wallet": "Solde faible : {{balance}}. Ouvrir le portefeuille"
+    "Low balance: {{balance}}. Open wallet": "Solde faible : {{balance}}. Ouvrir le portefeuille",
+    "Pay now": "Payer maintenant",
+    "Pay {{amount}}": "Payer {{amount}}",
+    "Save {{amount}}": "Économisez {{amount}}",
+    "Online top-up unavailable": "Recharge en ligne indisponible"
   }
 }

@@ -5525,6 +5525,10 @@
     "Top up": "Top up",
     "Top up & Wallet": "Top up & Wallet",
     "Balance: {{balance}}. Open wallet": "Balance: {{balance}}. Open wallet",
-    "Low balance: {{balance}}. Open wallet": "Low balance: {{balance}}. Open wallet"
+    "Low balance: {{balance}}. Open wallet": "Low balance: {{balance}}. Open wallet",
+    "Pay now": "Pay now",
+    "Pay {{amount}}": "Pay {{amount}}",
+    "Save {{amount}}": "Save {{amount}}",
+    "Online top-up unavailable": "Online top-up unavailable"
   }
 }

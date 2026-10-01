@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatQuota } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 import type { UserWalletData } from '../types'
 
@@ -52,6 +53,7 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
     description: string
     icon: typeof WalletCards
     tone: IconBadgeTone
+    highlight?: boolean
   }[] = [
     {
       label: t('Current Balance'),
@@ -59,6 +61,7 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
       description: t('Remaining quota'),
       icon: WalletCards,
       tone: 'success',
+      highlight: true,
     },
     {
       label: t('Total Usage'),
@@ -89,7 +92,12 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
             </div>
           </div>
 
-          <div className='text-foreground mt-1.5 font-mono text-sm font-bold tracking-tight break-all tabular-nums sm:mt-2.5 sm:text-2xl'>
+          <div
+            className={cn(
+              'mt-1.5 font-mono text-sm font-bold tracking-tight break-all tabular-nums sm:mt-2.5 sm:text-2xl',
+              item.highlight ? 'text-brand' : 'text-foreground'
+            )}
+          >
             {item.value}
           </div>
           <div className='text-muted-foreground/60 mt-1 hidden text-xs md:block'>

@@ -16,11 +16,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Gift, ExternalLink, Loader2, Receipt, WalletCards } from 'lucide-react'
+import {
+  Gift,
+  ExternalLink,
+  Info,
+  Loader2,
+  Receipt,
+  WalletCards,
+} from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { IconBadge } from '@/components/ui/icon-badge'
@@ -52,6 +59,7 @@ import type {
   WaffoPayMethod,
 } from '../types'
 import { CreemProductsSection } from './creem-products-section'
+import { StandardPaymentSection } from './standard-payment-section'
 
 interface RechargeFormCardProps {
   topupInfo: TopupInfo | null
@@ -200,6 +208,7 @@ export function RechargeFormCard({
       description={t('Choose an amount and payment method')}
       icon={<WalletCards className='h-4 w-4' />}
       iconTone='success'
+      titleClassName='text-xl font-bold sm:text-2xl'
       disableHoverEffect
       action={
         onOpenBilling ? (
@@ -246,31 +255,54 @@ export function RechargeFormCard({
                       return (
                         <Button
                           key={preset.value}
-                          variant='outline'
-                          className={cn(
-                            'flex min-h-16 flex-col items-start rounded-lg px-3 py-2.5 text-left whitespace-normal sm:min-h-[72px] sm:p-4',
+                          variant={
                             selectedPreset === preset.value
-                              ? 'border-foreground bg-foreground/5 dark:border-foreground dark:bg-foreground/10'
-                              : 'border-muted'
+                              ? 'default'
+                              : 'outline'
+                          }
+                          aria-pressed={selectedPreset === preset.value}
+                          className={cn(
+                            'flex h-auto min-h-[72px] flex-col items-start rounded-xl px-3.5 py-3 text-left whitespace-normal sm:min-h-[92px] sm:p-4',
+                            selectedPreset === preset.value
+                              ? 'border-primary hover:bg-primary/90'
+                              : 'border-border'
                           )}
                           onClick={() => onSelectPreset(preset)}
                         >
                           <div className='flex w-full items-center justify-between'>
-                            <div className='text-base font-semibold sm:text-lg'>
+                            <div className='font-mono text-xl font-bold tracking-tight tabular-nums sm:text-2xl'>
                               {formatNumber(displayValue)}
                             </div>
                             {hasDiscount && (
-                              <div className='text-xs font-medium text-green-600'>
+                              <div
+                                className={cn(
+                                  'text-xs font-medium',
+                                  selectedPreset === preset.value
+                                    ? 'text-primary-foreground'
+                                    : 'text-success'
+                                )}
+                              >
                                 {getDiscountLabel(discount)}
                               </div>
                             )}
                           </div>
-                          <div className='text-muted-foreground mt-1.5 w-full text-xs sm:mt-2'>
-                            Pay {formatCurrency(actualPrice)}
+                          <div
+                            className={cn(
+                              'mt-1.5 w-full text-xs font-normal sm:mt-2',
+                              selectedPreset === preset.value
+                                ? 'text-primary-foreground/75'
+                                : 'text-muted-foreground'
+                            )}
+                          >
+                            {t('Pay {{amount}}', {
+                              amount: formatCurrency(actualPrice),
+                            })}
                             {hasDiscount && savedAmount > 0 && (
-                              <span className='text-green-600'>
-                                {' '}
-                                • Save {formatCurrency(savedAmount)}
+                              <span>
+                                {' • '}
+                                {t('Save {{amount}}', {
+                                  amount: formatCurrency(savedAmount),
+                                })}
                               </span>
                             )}
                           </div>
@@ -288,7 +320,13 @@ export function RechargeFormCard({
                 >
                   {t('Custom Amount')}
                 </Label>
-                <div className='grid grid-cols-[minmax(0,1fr)_minmax(110px,0.55fr)] gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center'>
+                <div
+                  className={cn(
+                    'grid gap-2',
+                    !hasStandardPaymentMethods &&
+                      'grid-cols-[minmax(0,1fr)_minmax(110px,0.55fr)] lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center'
+                  )}
+                >
                   <Input
                     id='topup-amount'
                     type='number'
@@ -296,95 +334,40 @@ export function RechargeFormCard({
                     onChange={(e) => handleAmountChange(e.target.value)}
                     min={minTopup}
                     placeholder={`Minimum ${minTopup}`}
-                    className='h-9 text-base sm:h-10 sm:text-lg'
+                    className='h-10 text-base sm:h-11 sm:text-lg'
                   />
-                  <div className='bg-muted/30 flex min-h-9 items-center justify-between gap-2 rounded-md border px-3 lg:min-w-52'>
-                    <span className='text-muted-foreground truncate text-xs'>
-                      {t('Amount to pay:')}
-                    </span>
-                    {calculating ? (
-                      <Skeleton className='h-5 w-16' />
-                    ) : (
-                      <span className='text-sm font-semibold'>
-                        {formatCurrency(paymentAmount)}
+                  {!hasStandardPaymentMethods && (
+                    <div className='bg-muted/30 flex min-h-9 items-center justify-between gap-2 rounded-md border px-3 lg:min-w-52'>
+                      <span className='text-muted-foreground truncate text-xs'>
+                        {t('Amount to pay:')}
                       </span>
-                    )}
-                  </div>
+                      {calculating ? (
+                        <Skeleton className='h-5 w-16' />
+                      ) : (
+                        <span className='text-sm font-semibold'>
+                          {formatCurrency(paymentAmount)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className='space-y-2.5 sm:space-y-3'>
-                <Label className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
-                  {t('Payment Method')}
-                </Label>
-                {hasStandardPaymentMethods ? (
-                  <div className='grid grid-cols-2 gap-1.5 sm:gap-3 lg:grid-cols-3'>
-                    {topupInfo?.pay_methods?.map((method) => {
-                      const minTopup = Math.max(
-                        method.min_topup || 0,
-                        getMinTopupAmount(topupInfo)
-                      )
-                      const disabled = minTopup > topupAmount
-                      const disabledReason = disabled
-                        ? t('Minimum topup amount: {{amount}}', {
-                            amount: minTopup,
-                          })
-                        : undefined
-                      const disabledLabel = disabled
-                        ? `${t('Minimum:')} ${minTopup}`
-                        : undefined
-
-                      const button = (
-                        <Button
-                          key={method.type}
-                          variant='outline'
-                          onClick={() => onPaymentMethodSelect(method)}
-                          disabled={disabled || !!paymentLoading}
-                          title={disabledReason}
-                          aria-label={
-                            disabledReason
-                              ? `${method.name}. ${disabledReason}`
-                              : method.name
-                          }
-                          className='min-h-14 min-w-0 justify-start gap-2 rounded-lg px-3 py-2 text-left'
-                        >
-                          {paymentLoading === method.type ? (
-                            <Loader2 className='h-4 w-4 animate-spin' />
-                          ) : (
-                            getPaymentIcon(
-                              method.type,
-                              'h-4 w-4',
-                              method.icon,
-                              method.name
-                            )
-                          )}
-                          <span className='flex min-w-0 flex-col items-start gap-0.5'>
-                            <span className='max-w-full truncate'>
-                              {method.name}
-                            </span>
-                            {disabledLabel && (
-                              <span className='text-muted-foreground max-w-full truncate text-[11px] leading-4 font-normal'>
-                                {disabledLabel}
-                              </span>
-                            )}
-                          </span>
-                        </Button>
-                      )
-
-                      return disabled ? (
-                        <TooltipProvider key={method.type}>
-                          <Tooltip>
-                            <TooltipTrigger render={button} />
-                            <TooltipContent>{disabledReason}</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      ) : (
-                        button
-                      )
-                    })}
-                  </div>
-                ) : null}
-                {!hasStandardPaymentMethods && !hasWaffoPaymentMethods && (
+              {hasStandardPaymentMethods ? (
+                <StandardPaymentSection
+                  topupInfo={topupInfo}
+                  topupAmount={topupAmount}
+                  paymentAmount={paymentAmount}
+                  calculating={calculating}
+                  paymentLoading={paymentLoading}
+                  onPay={onPaymentMethodSelect}
+                />
+              ) : null}
+              {!hasStandardPaymentMethods && !hasWaffoPaymentMethods && (
+                <div className='space-y-2.5 sm:space-y-3'>
+                  <Label className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
+                    {t('Payment Method')}
+                  </Label>
                   <Alert>
                     <AlertDescription>
                       {t(
@@ -392,8 +375,8 @@ export function RechargeFormCard({
                       )}
                     </AlertDescription>
                   </Alert>
-                )}
-              </div>
+                </div>
+              )}
 
               {enableWaffoTopup &&
                 hasWaffoPaymentMethods &&
@@ -478,7 +461,12 @@ export function RechargeFormCard({
           )}
         </div>
       ) : (
-        <Alert>
+        <Alert
+          role='status'
+          className='border-info/40 bg-info/10 px-3.5 py-3 sm:px-4'
+        >
+          <Info className='text-info' aria-hidden='true' />
+          <AlertTitle>{t('Online top-up unavailable')}</AlertTitle>
           <AlertDescription>
             {t(
               'Online topup is not enabled. Please use redemption code or contact administrator.'
@@ -505,14 +493,25 @@ export function RechargeFormCard({
 
       {/* Redemption Code Section */}
       {redemptionEnabled ? (
-        <div className='space-y-2.5 border-t pt-4 sm:space-y-3 sm:pt-6'>
+        <div
+          className={cn(
+            'space-y-2.5 sm:space-y-3',
+            hasAnyTopup
+              ? 'border-t pt-4 sm:pt-6'
+              : 'bg-card rounded-xl border p-3.5 sm:p-5'
+          )}
+        >
           <div className='flex items-center gap-2'>
             <IconBadge tone='warning' size='xs'>
               <Gift />
             </IconBadge>
             <Label
               htmlFor='redemption-code'
-              className='text-muted-foreground text-xs font-medium tracking-wider uppercase'
+              className={cn(
+                hasAnyTopup
+                  ? 'text-muted-foreground text-xs font-medium tracking-wider uppercase'
+                  : 'text-foreground text-base font-semibold'
+              )}
             >
               {t('Have a Code?')}
             </Label>
@@ -523,13 +522,16 @@ export function RechargeFormCard({
               value={redemptionCode}
               onChange={(e) => onRedemptionCodeChange(e.target.value)}
               placeholder={t('Enter your redemption code')}
-              className='h-9 min-w-0'
+              className={cn('min-w-0', hasAnyTopup ? 'h-9' : 'h-11 text-base')}
             />
             <Button
               onClick={onRedeem}
               disabled={redeeming}
-              variant='outline'
-              className='h-9 px-4'
+              variant={hasAnyTopup ? 'outline' : 'default'}
+              className={cn(
+                'px-4',
+                hasAnyTopup ? 'h-9' : 'h-11 rounded-full px-6 font-bold'
+              )}
             >
               {redeeming && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
               {t('Redeem')}

@@ -5525,6 +5525,10 @@
     "Top up": "Пополнить",
     "Top up & Wallet": "Пополнение и кошелёк",
     "Balance: {{balance}}. Open wallet": "Баланс: {{balance}}. Открыть кошелёк",
-    "Low balance: {{balance}}. Open wallet": "Низкий баланс: {{balance}}. Открыть кошелёк"
+    "Low balance: {{balance}}. Open wallet": "Низкий баланс: {{balance}}. Открыть кошелёк",
+    "Pay now": "Оплатить",
+    "Pay {{amount}}": "К оплате {{amount}}",
+    "Save {{amount}}": "Экономия {{amount}}",
+    "Online top-up unavailable": "Онлайн-пополнение недоступно"
   }
 }

@@ -5525,6 +5525,10 @@
     "Top up": "儲值",
     "Top up & Wallet": "儲值 / 錢包",
     "Balance: {{balance}}. Open wallet": "餘額：{{balance}}，開啟錢包",
-    "Low balance: {{balance}}. Open wallet": "餘額偏低：{{balance}}，開啟錢包"
+    "Low balance: {{balance}}. Open wallet": "餘額偏低：{{balance}}，開啟錢包",
+    "Pay now": "立即支付",
+    "Pay {{amount}}": "應付 {{amount}}",
+    "Save {{amount}}": "節省 {{amount}}",
+    "Online top-up unavailable": "線上儲值暫不可用"
   }
 }

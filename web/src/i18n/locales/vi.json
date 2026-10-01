@@ -5525,6 +5525,10 @@
     "Top up": "Nạp tiền",
     "Top up & Wallet": "Nạp tiền & Ví",
     "Balance: {{balance}}. Open wallet": "Số dư: {{balance}}. Mở ví",
-    "Low balance: {{balance}}. Open wallet": "Số dư thấp: {{balance}}. Mở ví"
+    "Low balance: {{balance}}. Open wallet": "Số dư thấp: {{balance}}. Mở ví",
+    "Pay now": "Thanh toán ngay",
+    "Pay {{amount}}": "Thanh toán {{amount}}",
+    "Save {{amount}}": "Tiết kiệm {{amount}}",
+    "Online top-up unavailable": "Nạp tiền trực tuyến không khả dụng"
   }
 }

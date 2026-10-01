@@ -5525,6 +5525,10 @@
     "Top up": "チャージ",
     "Top up & Wallet": "チャージ / ウォレット",
     "Balance: {{balance}}. Open wallet": "残高：{{balance}}。ウォレットを開く",
-    "Low balance: {{balance}}. Open wallet": "残高不足：{{balance}}。ウォレットを開く"
+    "Low balance: {{balance}}. Open wallet": "残高不足：{{balance}}。ウォレットを開く",
+    "Pay now": "今すぐ支払う",
+    "Pay {{amount}}": "支払額 {{amount}}",
+    "Save {{amount}}": "{{amount}} お得",
+    "Online top-up unavailable": "オンラインチャージは利用できません"
   }
 }
