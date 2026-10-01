@@ -16,5 +16,4 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export { ApiMixHomeContent } from './sections/api-mix-home-content'
-export { Hero } from './sections/hero'
+export { ApiMixLanding } from './landing/apimix-landing'
