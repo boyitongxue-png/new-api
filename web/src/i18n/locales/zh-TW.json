@@ -5519,6 +5519,8 @@
     "home.landing.footTitleEmphasis": "這裡",
     "home.landing.footTitleAfter": "開始。",
     "home.landing.footNavLabel": "頁尾導覽",
-    "home.landing.footTagline": "OpenAI 相容 · 按量計費 · 穩定可用"
+    "home.landing.footTagline": "OpenAI 相容 · 按量計費 · 穩定可用",
+    "Main navigation": "主導覽",
+    "Sign in / Sign up": "登入 / 註冊"
   }
 }

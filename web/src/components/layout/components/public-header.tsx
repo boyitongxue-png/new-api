@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Dialog } from '@/components/dialog'
@@ -30,6 +30,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
+import { DEFAULT_LOGO } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -42,6 +43,51 @@ const AUTH_PROMPT_SECONDS = 5
 type AuthPromptTarget = {
   title: string
   href: string
+}
+
+type PillIndicator = {
+  left: number
+  width: number
+}
+
+/** A nav link is current on its own path and on nested paths below it. */
+function isNavLinkActive(pathname: string, href: string): boolean {
+  if (pathname === href) return true
+  return href !== '/' && pathname.startsWith(`${href}/`)
+}
+
+/**
+ * Brand mark next to the site name: an admin-provided logo wins; the shipped
+ * default logo is replaced by the API MIX lime square.
+ */
+function PublicHeaderBrandMark(props: {
+  customLogo?: React.ReactNode
+  systemLogo: string
+  logoLoaded: boolean
+}) {
+  if (props.customLogo) {
+    return (
+      <span className='flex size-7 shrink-0 items-center justify-center'>
+        {props.customLogo}
+      </span>
+    )
+  }
+  if (props.systemLogo && props.systemLogo !== DEFAULT_LOGO) {
+    return (
+      <HeaderLogo
+        src={props.systemLogo}
+        loading={false}
+        logoLoaded={props.logoLoaded}
+        className='size-7 shrink-0 rounded-md object-contain'
+      />
+    )
+  }
+  return (
+    <span
+      aria-hidden='true'
+      className='block size-[11px] shrink-0 bg-[var(--brand-lime,var(--primary))] transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-110 group-hover:rotate-90 motion-reduce:transition-none'
+    />
+  )
 }
 
 export interface PublicHeaderProps {
@@ -73,9 +119,13 @@ export function PublicHeader(props: PublicHeaderProps) {
     showNotifications = true,
   } = props
 
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [scrolled, setScrolled] = useState(false)
+  const pillRef = useRef<HTMLElement>(null)
+  const [pillIndicator, setPillIndicator] = useState<PillIndicator | null>(
+    null
+  )
   const [mobileOpen, setMobileOpen] = useState(false)
   const [authPromptTarget, setAuthPromptTarget] =
     useState<AuthPromptTarget | null>(null)
@@ -104,6 +154,35 @@ export function PublicHeader(props: PublicHeaderProps) {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  const movePillIndicator = useCallback((element: HTMLElement | null) => {
+    if (!element || !element.offsetWidth) {
+      setPillIndicator(null)
+      return
+    }
+    setPillIndicator({ left: element.offsetLeft, width: element.offsetWidth })
+  }, [])
+
+  // Park the sliding pill on the current page's link (or hide it).
+  const resetPillIndicator = useCallback(() => {
+    const active =
+      pillRef.current?.querySelector<HTMLElement>('[data-pill-active]') ?? null
+    movePillIndicator(active)
+  }, [movePillIndicator])
+
+  useEffect(() => {
+    let cancelled = false
+    resetPillIndicator()
+    // Brand fonts may swap in after first paint and change link widths.
+    document.fonts?.ready.then(() => {
+      if (!cancelled) resetPillIndicator()
+    })
+    window.addEventListener('resize', resetPillIndicator)
+    return () => {
+      cancelled = true
+      window.removeEventListener('resize', resetPillIndicator)
+    }
+  }, [resetPillIndicator, pathname, links.length, i18n.language])
 
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : ''
@@ -176,92 +255,117 @@ export function PublicHeader(props: PublicHeaderProps) {
   return (
     <>
       <header className='pointer-events-none fixed inset-x-0 top-0 z-50'>
+        {/* Backdrop fades in once the page scrolls (matches the landing nav). */}
         <div
+          aria-hidden='true'
           className={cn(
-            'pointer-events-auto mx-auto transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
-            scrolled ? 'max-w-[52rem] px-3 pt-3' : 'max-w-7xl px-4 pt-0 md:px-6'
+            'bg-background/70 border-border absolute inset-0 border-b backdrop-blur-xl backdrop-saturate-150 transition-opacity duration-500',
+            scrolled ? 'opacity-100' : 'opacity-0'
           )}
-        >
-          <nav
+        />
+        <div className='pointer-events-auto relative mx-auto w-full max-w-[1440px] px-4 md:px-[clamp(16px,4.45vw,64px)]'>
+          <div
             className={cn(
-              'flex items-center justify-between transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
-              scrolled
-                ? 'bg-background/60 ring-border/50 h-12 rounded-2xl pr-1.5 pl-4 shadow-[0_2px_16px_-6px_rgba(0,0,0,0.08),0_0_0_0.5px_rgba(0,0,0,0.02)] ring-[0.5px] backdrop-blur-2xl dark:shadow-[0_2px_16px_-6px_rgba(0,0,0,0.4)]'
-                : 'h-16 px-2'
+              'flex items-center justify-between gap-3 transition-[height] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] md:grid md:grid-cols-[1fr_auto_1fr]',
+              scrolled ? 'h-14 md:h-16' : 'h-16 md:h-[84px]'
             )}
           >
-            {/* Logo */}
+            {/* Brand */}
             <Link
               to={homeUrl}
-              className='group flex shrink-0 items-center gap-2.5'
+              className='group focus-visible:ring-ring/60 flex min-w-0 shrink-0 items-center gap-2.5 justify-self-start rounded-md outline-none focus-visible:ring-2'
             >
-              <div className='flex size-7 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
-                {loading ? (
-                  <Skeleton className='size-full rounded-lg' />
-                ) : customLogo ? (
-                  customLogo
-                ) : (
-                  <HeaderLogo
-                    src={systemLogo}
-                    loading={loading}
-                    logoLoaded={logoLoaded}
-                    className='size-full rounded-lg object-contain'
-                  />
-                )}
-              </div>
-              <span className='text-sm font-semibold tracking-tight'>
+              {loading ? (
+                <Skeleton className='size-3 rounded-none' />
+              ) : (
+                <PublicHeaderBrandMark
+                  customLogo={customLogo}
+                  systemLogo={systemLogo}
+                  logoLoaded={logoLoaded}
+                />
+              )}
+              <span className='truncate text-[17px] font-bold tracking-[-0.02em] md:text-[19px]'>
                 {loading ? <Skeleton className='h-4 w-16' /> : displaySiteName}
               </span>
             </Link>
 
-            {/* Desktop nav */}
-            <div className='hidden items-center gap-0.5 sm:flex'>
-              {links.map((link, i) => {
-                const isActive = pathname === link.href
-                if (link.external) {
+            {/* Desktop pill nav */}
+            {links.length > 0 ? (
+              <nav
+                ref={pillRef}
+                aria-label={t('Main navigation')}
+                onMouseLeave={resetPillIndicator}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) {
+                    resetPillIndicator()
+                  }
+                }}
+                className='border-border bg-card/50 font-apimix-cn relative hidden items-center gap-0.5 rounded-full border p-[5px] text-sm backdrop-blur-md md:flex'
+              >
+                <span
+                  aria-hidden='true'
+                  className='bg-foreground/[0.075] pointer-events-none absolute top-[5px] bottom-[5px] left-0 rounded-full shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--foreground)_5%,transparent)] transition-[transform,width,opacity] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none'
+                  style={{
+                    width: pillIndicator ? pillIndicator.width : 0,
+                    transform: `translateX(${pillIndicator ? pillIndicator.left : 0}px)`,
+                    opacity: pillIndicator ? 1 : 0,
+                  }}
+                />
+                {links.map((link, i) => {
+                  const isActive = isNavLinkActive(pathname, link.href)
+                  const pillLinkClassName = cn(
+                    'relative z-[1] rounded-full px-[18px] py-2 whitespace-nowrap transition-colors duration-300 outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+                    isActive
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground',
+                    link.disabled && 'pointer-events-none opacity-50'
+                  )
+                  const indicatorHandlers = {
+                    onMouseEnter: (event: React.MouseEvent<HTMLElement>) =>
+                      movePillIndicator(event.currentTarget),
+                    onFocus: (event: React.FocusEvent<HTMLElement>) =>
+                      movePillIndicator(event.currentTarget),
+                  }
+                  if (link.external) {
+                    return (
+                      <a
+                        key={i}
+                        href={link.href}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        aria-disabled={link.disabled}
+                        tabIndex={link.disabled ? -1 : undefined}
+                        data-pill-active={isActive || undefined}
+                        onClick={(event) => handleNavLinkClick(event, link)}
+                        className={pillLinkClassName}
+                        {...indicatorHandlers}
+                      >
+                        {t(link.title)}
+                      </a>
+                    )
+                  }
                   return (
-                    <a
+                    <Link
                       key={i}
-                      href={link.href}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      aria-disabled={link.disabled}
-                      tabIndex={link.disabled ? -1 : undefined}
+                      to={link.href}
+                      disabled={link.disabled}
+                      aria-current={isActive ? 'page' : undefined}
+                      data-pill-active={isActive || undefined}
                       onClick={(event) => handleNavLinkClick(event, link)}
-                      className={cn(
-                        'text-muted-foreground hover:text-foreground rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
-                        link.disabled && 'pointer-events-none opacity-50'
-                      )}
+                      className={pillLinkClassName}
+                      {...indicatorHandlers}
                     >
                       {t(link.title)}
-                    </a>
+                    </Link>
                   )
-                }
-                return (
-                  <Link
-                    key={i}
-                    to={link.href}
-                    disabled={link.disabled}
-                    onClick={(event) => handleNavLinkClick(event, link)}
-                    className={cn(
-                      'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
-                      isActive
-                        ? 'text-foreground'
-                        : 'text-muted-foreground hover:text-foreground',
-                      link.disabled && 'pointer-events-none opacity-50'
-                    )}
-                  >
-                    {t(link.title)}
-                  </Link>
-                )
-              })}
+                })}
+              </nav>
+            ) : (
+              <span className='hidden md:block' />
+            )}
 
-              {(showLanguageSwitcher ||
-                showThemeSwitch ||
-                showNotifications) && (
-                <div className='bg-border/40 mx-2 h-4 w-px' />
-              )}
-
+            {/* Desktop utilities + primary action */}
+            <div className='hidden items-center justify-end gap-1 justify-self-end md:flex'>
               {showLanguageSwitcher && <LanguageSwitcher />}
               {showThemeSwitch && <ThemeSwitch />}
               {showNotifications && (
@@ -279,29 +383,36 @@ export function PublicHeader(props: PublicHeaderProps) {
 
               {showAuthButtons && (
                 <>
-                  <div className='bg-border/40 mx-1 h-4 w-px' />
+                  <div className='bg-border mx-1.5 h-4 w-px' />
                   {loading ? (
-                    <Skeleton className='h-8 w-20 rounded-lg' />
+                    <Skeleton className='h-[42px] w-28 rounded-full' />
                   ) : isAuthenticated ? (
                     <ProfileDropdown />
                   ) : (
-                    <Button
-                      size='sm'
-                      className='h-8 rounded-lg px-3.5 text-xs font-medium'
-                      render={<Link to='/sign-in' />}
+                    <Link
+                      to='/sign-in'
+                      className='brand-fill font-apimix-cn focus-visible:ring-ring/60 focus-visible:ring-offset-background inline-flex h-[42px] items-center justify-center rounded-full px-5 text-sm font-bold whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
                     >
-                      {t('Sign in')}
-                    </Button>
+                      {t('Sign in / Sign up')}
+                    </Link>
                   )}
                 </>
               )}
             </div>
 
             {/* Mobile: compact actions + hamburger */}
-            <div className='flex items-center gap-2 sm:hidden'>
+            <div className='flex items-center gap-2 md:hidden'>
               {showThemeSwitch && <ThemeSwitch />}
               {showAuthButtons && !loading && isAuthenticated && (
                 <ProfileDropdown />
+              )}
+              {showAuthButtons && !loading && !isAuthenticated && (
+                <Link
+                  to='/sign-in'
+                  className='brand-fill font-apimix-cn focus-visible:ring-ring/60 inline-flex h-9 items-center justify-center rounded-full px-4 text-[13px] font-bold whitespace-nowrap outline-none focus-visible:ring-2'
+                >
+                  {t('Sign in')}
+                </Link>
               )}
               <Button
                 type='button'
@@ -310,6 +421,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                 className='size-9'
                 onClick={() => setMobileOpen((v) => !v)}
                 aria-label={t('Toggle navigation menu')}
+                aria-expanded={mobileOpen}
               >
                 <div className='relative size-4'>
                   <span
@@ -333,14 +445,14 @@ export function PublicHeader(props: PublicHeaderProps) {
                 </div>
               </Button>
             </div>
-          </nav>
+          </div>
         </div>
       </header>
 
       {/* Mobile full-screen overlay */}
       <div
         className={cn(
-          'bg-background/98 fixed inset-0 z-40 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] sm:pointer-events-none sm:hidden',
+          'bg-background/98 fixed inset-0 z-40 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] md:pointer-events-none md:hidden',
           mobileOpen
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0'
@@ -349,7 +461,7 @@ export function PublicHeader(props: PublicHeaderProps) {
         <div className='flex h-full flex-col justify-between px-8 pt-20 pb-10'>
           <nav className='flex flex-col gap-1'>
             {links.map((link, i) => {
-              const isActive = pathname === link.href
+              const isActive = isNavLinkActive(pathname, link.href)
               const linkClassName = cn(
                 'flex items-center gap-3 py-3 text-base font-medium tracking-tight transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
                 mobileOpen
@@ -406,7 +518,7 @@ export function PublicHeader(props: PublicHeaderProps) {
               <Link
                 to={isAuthenticated ? '/dashboard' : '/sign-in'}
                 onClick={() => setMobileOpen(false)}
-                className='bg-foreground text-background inline-flex h-10 items-center justify-center rounded-lg text-sm font-medium transition-opacity hover:opacity-90 active:opacity-80'
+                className='brand-fill font-apimix-cn inline-flex h-11 items-center justify-center rounded-full text-sm font-bold transition-colors'
               >
                 {isAuthenticated ? t('Go to Dashboard') : t('Sign in')}
               </Link>
