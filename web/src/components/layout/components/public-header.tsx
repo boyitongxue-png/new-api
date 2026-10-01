@@ -273,7 +273,7 @@ export function PublicHeader(props: PublicHeaderProps) {
             {/* Brand */}
             <Link
               to={homeUrl}
-              className='group focus-visible:ring-ring/60 flex min-w-0 shrink-0 items-center gap-2.5 justify-self-start rounded-md outline-none focus-visible:ring-2'
+              className='group focus-visible:ring-ring/60 flex min-w-0 items-center gap-2.5 justify-self-start rounded-md outline-none focus-visible:ring-2'
             >
               {loading ? (
                 <Skeleton className='size-3 rounded-none' />
