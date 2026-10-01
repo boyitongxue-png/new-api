@@ -5521,6 +5521,10 @@
     "home.landing.footNavLabel": "Footer navigation",
     "home.landing.footTagline": "OpenAI compatible · Pay as you go · Reliable uptime",
     "Main navigation": "Основная навигация",
-    "Sign in / Sign up": "Вход / Регистрация"
+    "Sign in / Sign up": "Вход / Регистрация",
+    "Top up": "Пополнить",
+    "Top up & Wallet": "Пополнение и кошелёк",
+    "Balance: {{balance}}. Open wallet": "Баланс: {{balance}}. Открыть кошелёк",
+    "Low balance: {{balance}}. Open wallet": "Низкий баланс: {{balance}}. Открыть кошелёк"
   }
 }

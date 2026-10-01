@@ -5521,6 +5521,10 @@
     "home.landing.footNavLabel": "页脚导航",
     "home.landing.footTagline": "OpenAI 兼容 · 按量计费 · 稳定可用",
     "Main navigation": "主导航",
-    "Sign in / Sign up": "登录 / 注册"
+    "Sign in / Sign up": "登录 / 注册",
+    "Top up": "充值",
+    "Top up & Wallet": "充值 / 钱包",
+    "Balance: {{balance}}. Open wallet": "余额：{{balance}}，打开钱包",
+    "Low balance: {{balance}}. Open wallet": "余额偏低：{{balance}}，打开钱包"
   }
 }

@@ -5521,6 +5521,10 @@
     "home.landing.footNavLabel": "Footer navigation",
     "home.landing.footTagline": "OpenAI compatible · Pay as you go · Reliable uptime",
     "Main navigation": "メインナビゲーション",
-    "Sign in / Sign up": "ログイン / 新規登録"
+    "Sign in / Sign up": "ログイン / 新規登録",
+    "Top up": "チャージ",
+    "Top up & Wallet": "チャージ / ウォレット",
+    "Balance: {{balance}}. Open wallet": "残高：{{balance}}。ウォレットを開く",
+    "Low balance: {{balance}}. Open wallet": "残高不足：{{balance}}。ウォレットを開く"
   }
 }

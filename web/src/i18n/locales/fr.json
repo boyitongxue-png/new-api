@@ -5521,6 +5521,10 @@
     "home.landing.footNavLabel": "Footer navigation",
     "home.landing.footTagline": "OpenAI compatible · Pay as you go · Reliable uptime",
     "Main navigation": "Navigation principale",
-    "Sign in / Sign up": "Connexion / Inscription"
+    "Sign in / Sign up": "Connexion / Inscription",
+    "Top up": "Recharger",
+    "Top up & Wallet": "Recharge et portefeuille",
+    "Balance: {{balance}}. Open wallet": "Solde : {{balance}}. Ouvrir le portefeuille",
+    "Low balance: {{balance}}. Open wallet": "Solde faible : {{balance}}. Ouvrir le portefeuille"
   }
 }
