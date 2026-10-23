@@ -153,3 +153,16 @@ func TestUpdateWithConfigurationMigrationRollsBackMalformedChannelMapping(t *tes
 	require.NoError(t, DB.First(&channel, 910003).Error)
 	assert.Equal(t, "rollback-model,other-model", channel.Models)
 }
+
+func TestGetBoundChannelsIncludesDisabledChannelWithStatus(t *testing.T) {
+	prepareModelCommercialTest(t)
+	createCommercialTestModelAndChannel(t, "disabled-bound-model", 910003, "disabled-bound-model")
+	require.NoError(t, DB.Model(&Channel{}).Where("id = ?", 910003).Update("status", common.ChannelStatusManuallyDisabled).Error)
+	require.NoError(t, DB.Model(&Ability{}).Where("channel_id = ?", 910003).Update("enabled", false).Error)
+
+	channels, err := GetBoundChannelsByModelsMap([]string{"disabled-bound-model"})
+	require.NoError(t, err)
+	require.Len(t, channels["disabled-bound-model"], 1)
+	assert.Equal(t, 910003, channels["disabled-bound-model"][0].Id)
+	assert.Equal(t, common.ChannelStatusManuallyDisabled, channels["disabled-bound-model"][0].Status)
+}

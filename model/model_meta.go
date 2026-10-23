@@ -21,6 +21,7 @@ type BoundChannel struct {
 	Id            int    `json:"id"`
 	Name          string `json:"name"`
 	Type          int    `json:"type"`
+	Status        int    `json:"status"`
 	UpstreamModel string `json:"upstream_model"`
 }
 
@@ -123,13 +124,16 @@ func GetBoundChannelsByModelsMap(modelNames []string) (map[string][]BoundChannel
 		Model        string
 		Name         string
 		Type         int
+		Status       int
 		ModelMapping *string
 	}
+	// Disabled channels are included (with their status) so the admin UI shows
+	// every binding and manual re-binding never drops a disabled channel.
 	var rows []row
 	err := DB.Table("channels").
-		Select("channels.id as id, abilities.model as model, channels.name as name, channels.type as type, channels.model_mapping as model_mapping").
+		Select("channels.id as id, abilities.model as model, channels.name as name, channels.type as type, channels.status as status, channels.model_mapping as model_mapping").
 		Joins("JOIN abilities ON abilities.channel_id = channels.id").
-		Where("abilities.model IN ? AND abilities.enabled = ?", modelNames, true).
+		Where("abilities.model IN ?", modelNames).
 		Distinct().
 		Scan(&rows).Error
 	if err != nil {
@@ -146,6 +150,7 @@ func GetBoundChannelsByModelsMap(modelNames []string) (map[string][]BoundChannel
 			Id:            r.ID,
 			Name:          r.Name,
 			Type:          r.Type,
+			Status:        r.Status,
 			UpstreamModel: upstreamModel,
 		})
 	}

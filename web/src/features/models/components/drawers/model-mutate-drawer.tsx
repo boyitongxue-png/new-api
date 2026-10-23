@@ -1036,7 +1036,10 @@ export function ModelMutateDrawer({
                   <MultiSelect
                     options={channels.map((channel) => ({
                       value: String(channel.id),
-                      label: `${channel.name} (#${channel.id})`,
+                      label:
+                        channel.status === 1
+                          ? `${channel.name} (#${channel.id})`
+                          : `${channel.name} (#${channel.id}) · ${t('Disabled')}`,
                     }))}
                     selected={selectedChannelIds}
                     onChange={setSelectedChannelIds}

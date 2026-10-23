@@ -473,14 +473,23 @@ export function useModelsColumns(
         }>
         return (
           <BadgeListCell
-            items={(channels ?? []).map((c) => (
-              <StatusBadge
-                key={c.id}
-                label={`${c.name} (${c.type})`}
-                autoColor={c.name}
-                size='sm'
-              />
-            ))}
+            items={(channels ?? []).map((c) =>
+              c.status !== undefined && c.status !== 1 ? (
+                <StatusBadge
+                  key={c.id}
+                  label={`${c.name} (${c.type}) · ${t('Disabled')}`}
+                  variant='neutral'
+                  size='sm'
+                />
+              ) : (
+                <StatusBadge
+                  key={c.id}
+                  label={`${c.name} (${c.type})`}
+                  autoColor={c.name}
+                  size='sm'
+                />
+              )
+            )}
           />
         )
       },
