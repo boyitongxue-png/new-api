@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -108,7 +109,7 @@ func GetVendorModelCounts() (map[int64]int64, error) {
 }
 
 func GetAllModels(offset int, limit int) ([]*Model, error) {
-	models, _, err := SearchModels("", "", "", "", offset, limit)
+	models, _, err := SearchModels("", "", "", "", 0, offset, limit)
 	return models, err
 }
 
@@ -207,7 +208,7 @@ func GetPreferredModelOwnerChannelTypes(modelNames []string, groups []string) (m
 	return result, nil
 }
 
-func SearchModels(keyword string, vendor string, status string, syncOfficial string, offset int, limit int) ([]*Model, int64, error) {
+func SearchModels(keyword string, vendor string, status string, syncOfficial string, channelID int, offset int, limit int) ([]*Model, int64, error) {
 	var models []*Model
 	db := DB.Model(&Model{})
 	if keyword != "" {
@@ -227,6 +228,9 @@ func SearchModels(keyword string, vendor string, status string, syncOfficial str
 	if syncValue, ok := parseModelSyncFilter(syncOfficial); ok {
 		db = db.Where("models.sync_official = ?", syncValue)
 	}
+	if channelID > 0 {
+		db = db.Where("EXISTS (SELECT 1 FROM abilities WHERE abilities.model = models.model_name AND abilities.channel_id = ? AND abilities.enabled = ?)", channelID, true)
+	}
 	var total int64
 	if err := db.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -235,6 +239,131 @@ func SearchModels(keyword string, vendor string, status string, syncOfficial str
 		return nil, 0, err
 	}
 	return models, total, nil
+}
+
+// UpdateModelChannelBindings synchronizes a model's explicit channel selection
+// with the channel model lists and their derived abilities. Automatic binding
+// intentionally keeps the existing channel configuration unchanged.
+func UpdateModelChannelBindings(modelID int, mode string, channelIDs []int) error {
+	if mode != "manual" {
+		return nil
+	}
+
+	selected := make(map[int]struct{}, len(channelIDs))
+	for _, channelID := range channelIDs {
+		if channelID > 0 {
+			selected[channelID] = struct{}{}
+		}
+	}
+
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var target Model
+		if err := lockForUpdate(tx).First(&target, modelID).Error; err != nil {
+			return err
+		}
+
+		var boundIDs []int
+		if err := tx.Model(&Ability{}).
+			Where("model = ?", target.ModelName).
+			Distinct("channel_id").
+			Pluck("channel_id", &boundIDs).Error; err != nil {
+			return err
+		}
+		allIDs := make(map[int]struct{}, len(boundIDs)+len(selected))
+		for _, channelID := range boundIDs {
+			allIDs[channelID] = struct{}{}
+		}
+		for channelID := range selected {
+			allIDs[channelID] = struct{}{}
+		}
+		if len(allIDs) == 0 {
+			return nil
+		}
+
+		ids := make([]int, 0, len(allIDs))
+		for channelID := range allIDs {
+			ids = append(ids, channelID)
+		}
+		var channels []Channel
+		if err := lockForUpdate(tx).Where("id IN ?", ids).Find(&channels).Error; err != nil {
+			return err
+		}
+		if len(channels) != len(ids) {
+			return fmt.Errorf("one or more channels do not exist")
+		}
+
+		for i := range channels {
+			channel := &channels[i]
+			_, shouldBind := selected[channel.Id]
+			if shouldBind {
+				channel.Models = appendModelName(channel.Models, target.ModelName)
+			} else {
+				channel.Models = removeModelName(channel.Models, target.ModelName)
+				mapping, err := removeModelMapping(channel.GetModelMapping(), target.ModelName)
+				if err != nil {
+					return err
+				}
+				channel.ModelMapping = &mapping
+			}
+			if err := tx.Model(&Channel{}).Where("id = ?", channel.Id).
+				Select("models", "model_mapping").Updates(channel).Error; err != nil {
+				return err
+			}
+			if err := channel.UpdateAbilities(tx); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err == nil {
+		InitChannelCache()
+	}
+	return err
+}
+
+func appendModelName(value, modelName string) string {
+	parts := strings.Split(value, ",")
+	seen := make(map[string]struct{}, len(parts)+1)
+	result := make([]string, 0, len(parts)+1)
+	for _, part := range append(parts, modelName) {
+		name := strings.TrimSpace(part)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		result = append(result, name)
+	}
+	return strings.Join(result, ",")
+}
+
+func removeModelName(value, modelName string) string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		name := strings.TrimSpace(part)
+		if name != "" && name != modelName {
+			result = append(result, name)
+		}
+	}
+	return strings.Join(result, ",")
+}
+
+func removeModelMapping(value, modelName string) (string, error) {
+	mapping := make(map[string]string)
+	if strings.TrimSpace(value) != "" && strings.TrimSpace(value) != "{}" {
+		if err := common.UnmarshalJsonStr(value, &mapping); err != nil {
+			return "", fmt.Errorf("invalid channel model mapping: %w", err)
+		}
+	}
+	delete(mapping, modelName)
+	data, err := common.Marshal(mapping)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 // parseModelStatusFilter maps UI/API status values to the models.status column.

@@ -28,6 +28,8 @@ import { useMediaQuery } from '@/hooks'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
 
 import { getModels, searchModels, getVendors } from '../api'
+import { getChannels } from '@/features/channels/api'
+import { channelsQueryKeys } from '@/features/channels/lib'
 import {
   DEFAULT_PAGE_SIZE,
   getModelStatusOptions,
@@ -67,6 +69,7 @@ export function ModelsTable() {
       { columnId: 'status', searchKey: 'status', type: 'array' },
       { columnId: 'vendor_id', searchKey: 'vendor', type: 'array' },
       { columnId: 'sync_official', searchKey: 'sync', type: 'array' },
+      { columnId: 'channel_id', searchKey: 'channel_id', type: 'array' },
     ],
   })
 
@@ -78,17 +81,28 @@ export function ModelsTable() {
   const syncFilter =
     (columnFilters.find((f) => f.id === 'sync_official')?.value as string[]) ||
     []
+  const channelFilter =
+    (columnFilters.find((f) => f.id === 'channel_id')?.value as string[]) ||
+    []
 
   // Fetch vendors for filter
   const { data: vendorsData } = useQuery({
     queryKey: vendorsQueryKeys.list(),
     queryFn: () => getVendors({ page_size: 1000 }),
   })
+  const { data: channelsData } = useQuery({
+    queryKey: channelsQueryKeys.list({ page_size: 1000 }),
+    queryFn: () => getChannels({ page_size: 1000 }),
+  })
   const { data: systemOptionsData } = useSystemOptions()
 
   const vendors = useMemo(
     () => vendorsData?.data?.items || [],
     [vendorsData?.data?.items]
+  )
+  const channels = useMemo(
+    () => channelsData?.data?.items || [],
+    [channelsData?.data?.items]
   )
 
   const vendorOptions = useMemo(() => {
@@ -113,13 +127,18 @@ export function ModelsTable() {
     syncFilter.length > 0 && !syncFilter.includes('all')
       ? syncFilter[0]
       : undefined
+  const channelFilterValue =
+    channelFilter.length > 0 && !channelFilter.includes('all')
+      ? channelFilter[0]
+      : undefined
 
   // Use search API whenever any filter is active so status/sync are applied server-side
   const shouldSearch = Boolean(
     globalFilter?.trim() ||
     activeVendorFilter ||
     statusFilterValue ||
-    syncFilterValue
+    syncFilterValue ||
+    channelFilterValue
   )
 
   // Fetch models data
@@ -130,6 +149,7 @@ export function ModelsTable() {
       vendor: activeVendorFilter,
       status: statusFilterValue,
       sync_official: syncFilterValue,
+      channel_id: channelFilterValue,
       p: pagination.pageIndex + 1,
       page_size: pagination.pageSize,
     }),
@@ -140,6 +160,7 @@ export function ModelsTable() {
           vendor: activeVendorFilter,
           status: statusFilterValue,
           sync_official: syncFilterValue,
+          channel_id: channelFilterValue,
           p: pagination.pageIndex + 1,
           page_size: pagination.pageSize,
         })
@@ -228,6 +249,13 @@ export function ModelsTable() {
       value: option.value,
     })),
   ]
+  const channelFilterOptions = [
+    { label: t('All Channels'), value: 'all' },
+    ...channels.map((channel) => ({
+      label: `${channel.name} (#${channel.id})`,
+      value: String(channel.id),
+    })),
+  ]
 
   return (
     <DataTablePage
@@ -260,6 +288,12 @@ export function ModelsTable() {
             columnId: 'sync_official',
             title: t('Official Sync'),
             options: [...getSyncStatusOptions(t)],
+            singleSelect: true,
+          },
+          {
+            columnId: 'channel_id',
+            title: t('Channel'),
+            options: channelFilterOptions,
             singleSelect: true,
           },
         ],

@@ -37,6 +37,7 @@ import type {
   SyncOverwritePayload,
   DeploymentSettingsResponse,
   ListDeploymentsResponse,
+  UpdateModelBindingsRequest,
 } from './types'
 
 // ============================================================================
@@ -88,6 +89,14 @@ export async function updateModel(
   data: Partial<Model> & { id: number }
 ): Promise<{ success: boolean; message?: string; data?: Model }> {
   const res = await api.put('/api/models/', data)
+  return res.data
+}
+
+export async function updateModelBindings(
+  modelId: number,
+  data: UpdateModelBindingsRequest
+): Promise<{ success: boolean; message?: string; data?: Model }> {
+  const res = await api.put(`/api/models/${modelId}/bindings`, data)
   return res.data
 }
 

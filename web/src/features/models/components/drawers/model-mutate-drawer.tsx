@@ -81,10 +81,19 @@ import { normalizeJsonString } from '@/features/system-settings/models/utils'
 import type { ModelSettings } from '@/features/system-settings/types'
 import { safeJsonParse } from '@/features/system-settings/utils/json-parser'
 
-import { createModel, updateModel, getModel, getVendors } from '../../api'
+import {
+  createModel,
+  updateModel,
+  updateModelBindings,
+  getModel,
+  getVendors,
+} from '../../api'
 import { getNameRuleOptions, ENDPOINT_TEMPLATES } from '../../constants'
 import { modelsQueryKeys, vendorsQueryKeys, parseModelTags } from '../../lib'
 import type { Model } from '../../types'
+import { getChannels } from '@/features/channels/api'
+import { channelsQueryKeys } from '@/features/channels/lib'
+import { MultiSelect } from '@/components/multi-select'
 import { useModels } from '../models-provider'
 
 // Extended schema for ratio configuration (internal form state only)
@@ -255,6 +264,8 @@ export function ModelMutateDrawer({
   // Submit may only rewrite pricing for this name, or for a name the user
   // explicitly priced; anything else it never saw and must leave alone.
   const [loadedPricingName, setLoadedPricingName] = useState<string>('')
+  const [bindingMode, setBindingMode] = useState<'auto' | 'manual'>('auto')
+  const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([])
   // Keep a ref so the load effect can read the latest modelSettings without
   // depending on it: modelSettings is a fresh object on every system-options
   // refetch, and including it in the deps would reset the form under the user.
@@ -268,6 +279,14 @@ export function ModelMutateDrawer({
   })
 
   const vendors = vendorsData?.data?.items || []
+
+  const { data: channelsData, isLoading: isLoadingChannels } = useQuery({
+    queryKey: channelsQueryKeys.list({ page_size: 1000 }),
+    queryFn: () => getChannels({ page_size: 1000 }),
+    enabled: open,
+  })
+
+  const channels = channelsData?.data?.items || []
 
   // Fetch model detail if editing
   const { data: modelData } = useQuery({
@@ -424,6 +443,13 @@ export function ModelMutateDrawer({
     if (open && isEditing && modelData?.data) {
       const model = modelData.data
       setOldModelName(model.model_name)
+      setBindingMode('auto')
+      setSelectedChannelIds(
+        (model.bound_channels || [])
+          .map((channel) => channel.id)
+          .filter((id): id is number => typeof id === 'number')
+          .map(String)
+      )
 
       const pricing = readPricingConfig(
         modelSettingsRef.current,
@@ -455,6 +481,8 @@ export function ModelMutateDrawer({
       const modelName = currentRow?.model_name || ''
       const pricing = readPricingConfig(modelSettingsRef.current, modelName)
       setOldModelName('')
+      setBindingMode('auto')
+      setSelectedChannelIds([])
       setLoadedPricingName(modelName)
       setPricingSubMode('ratio')
       setPricingMode(pricing.mode)
@@ -506,6 +534,16 @@ export function ModelMutateDrawer({
             : await createModel(modelData)
 
         if (response.success) {
+          const savedModelId = response.data?.id || currentModelId
+          if (savedModelId && bindingMode === 'manual') {
+            const bindingResponse = await updateModelBindings(savedModelId, {
+              mode: bindingMode,
+              channel_ids: selectedChannelIds.map(Number),
+            })
+            if (!bindingResponse.success) {
+              throw new Error(bindingResponse.message || t('Operation failed'))
+            }
+          }
           // Handle ratio configuration updates in system settings
           const finalModelName = values.model_name
           const hasRatioConfig =
@@ -702,6 +740,14 @@ export function ModelMutateDrawer({
               : 'Model created successfully'
           )
           queryClient.invalidateQueries({ queryKey: modelsQueryKeys.lists() })
+          queryClient.invalidateQueries({
+            queryKey: channelsQueryKeys.lists(),
+          })
+          if (savedModelId) {
+            queryClient.invalidateQueries({
+              queryKey: modelsQueryKeys.detail(savedModelId),
+            })
+          }
           queryClient.invalidateQueries({ queryKey: ['system-options'] })
           onOpenChange(false)
         } else {
@@ -723,6 +769,9 @@ export function ModelMutateDrawer({
       loadedPricingName,
       modelSettings,
       updateOption,
+      bindingMode,
+      selectedChannelIds,
+      t,
     ]
   )
 
@@ -938,6 +987,74 @@ export function ModelMutateDrawer({
                   </FormItem>
                 )}
               />
+            </SideDrawerSection>
+
+            {/* Channel Binding */}
+            <SideDrawerSection>
+              <h3 className='text-sm font-semibold'>{t('Channel Binding')}</h3>
+              <div className='space-y-3'>
+                <Label>{t('Channel binding mode')}</Label>
+                <RadioGroup
+                  value={bindingMode}
+                  onValueChange={(value) =>
+                    setBindingMode(value as 'auto' | 'manual')
+                  }
+                  className='grid gap-3 sm:grid-cols-2'
+                >
+                  <div className='flex items-start space-x-2'>
+                    <RadioGroupItem value='auto' id='binding-auto' />
+                    <div className='space-y-1'>
+                      <Label htmlFor='binding-auto' className='font-normal'>
+                        {t('Auto')}
+                      </Label>
+                      <p className='text-muted-foreground text-xs'>
+                        {t(
+                          'Automatic channel binding uses channels that publish this model name.'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className='flex items-start space-x-2'>
+                    <RadioGroupItem value='manual' id='binding-manual' />
+                    <div className='space-y-1'>
+                      <Label htmlFor='binding-manual' className='font-normal'>
+                        {t('Manual')}
+                      </Label>
+                      <p className='text-muted-foreground text-xs'>
+                        {t(
+                          'Choose the channels that should publish this model.'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {bindingMode === 'manual' && (
+                <div className='space-y-2'>
+                  <Label>{t('Channels')}</Label>
+                  <MultiSelect
+                    options={channels.map((channel) => ({
+                      value: String(channel.id),
+                      label: `${channel.name} (#${channel.id})`,
+                    }))}
+                    selected={selectedChannelIds}
+                    onChange={setSelectedChannelIds}
+                    placeholder={
+                      isLoadingChannels
+                        ? t('Loading...')
+                        : t('Select channels')
+                    }
+                    emptyText={t('No channels found')}
+                    disabled={isLoadingChannels}
+                  />
+                  <p className='text-muted-foreground text-xs'>
+                    {t(
+                      'Manual binding updates channel model lists immediately.'
+                    )}
+                  </p>
+                </div>
+              )}
             </SideDrawerSection>
 
             {/* Matching Configuration */}

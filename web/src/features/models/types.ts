@@ -95,6 +95,7 @@ export interface GetModelsParams {
   vendor?: string // vendor ID to filter by
   status?: string // filter by status
   sync_official?: string // filter by sync_official status
+  channel_id?: string // channel ID to filter by
 }
 
 /**
@@ -105,6 +106,7 @@ export interface SearchModelsParams {
   vendor?: string // vendor ID to filter by
   status?: string // filter by status
   sync_official?: string // filter by sync_official status
+  channel_id?: string // channel ID to filter by
   p?: number
   page_size?: number
 }
@@ -222,6 +224,13 @@ export interface PrefillGroupsResponse {
   success: boolean
   message?: string
   data?: PrefillGroup[]
+}
+
+export type ModelBindingMode = 'auto' | 'manual'
+
+export interface UpdateModelBindingsRequest {
+  mode: ModelBindingMode
+  channel_ids: number[]
 }
 
 // ============================================================================

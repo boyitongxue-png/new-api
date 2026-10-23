@@ -19,7 +19,8 @@ func GetAllModelsMeta(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 	status := c.Query("status")
 	syncOfficial := c.Query("sync_official")
-	modelsMeta, total, err := model.SearchModels("", "", status, syncOfficial, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	channelID, _ := strconv.Atoi(c.Query("channel_id"))
+	modelsMeta, total, err := model.SearchModels("", "", status, syncOfficial, channelID, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -48,9 +49,10 @@ func SearchModelsMeta(c *gin.Context) {
 	vendor := c.Query("vendor")
 	status := c.Query("status")
 	syncOfficial := c.Query("sync_official")
+	channelID, _ := strconv.Atoi(c.Query("channel_id"))
 	pageInfo := common.GetPageQuery(c)
 
-	modelsMeta, total, err := model.SearchModels(keyword, vendor, status, syncOfficial, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	modelsMeta, total, err := model.SearchModels(keyword, vendor, status, syncOfficial, channelID, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -155,6 +157,40 @@ func UpdateModelMeta(c *gin.Context) {
 	}
 	model.RefreshPricing()
 	common.ApiSuccess(c, &m)
+}
+
+type modelBindingsRequest struct {
+	Mode       string `json:"mode"`
+	ChannelIDs []int  `json:"channel_ids"`
+}
+
+func UpdateModelBindings(c *gin.Context) {
+	modelID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	var request modelBindingsRequest
+	if err := common.DecodeJson(c.Request.Body, &request); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	request.Mode = strings.ToLower(strings.TrimSpace(request.Mode))
+	if request.Mode != "auto" && request.Mode != "manual" {
+		common.ApiErrorMsg(c, "绑定模式无效")
+		return
+	}
+	if err := model.UpdateModelChannelBindings(modelID, request.Mode, request.ChannelIDs); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	var updated model.Model
+	if err := model.DB.First(&updated, modelID).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	enrichModels([]*model.Model{&updated})
+	common.ApiSuccess(c, &updated)
 }
 
 type modelCommercialConfigRequest struct {
