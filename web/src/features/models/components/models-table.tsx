@@ -225,6 +225,7 @@ export function ModelsTable() {
       sync_official: false,
       created_time: false,
       updated_time: false,
+      channel_id: false,
     },
     columnFilters,
     pagination,

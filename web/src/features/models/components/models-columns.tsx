@@ -488,6 +488,18 @@ export function useModelsColumns(
       enableSorting: false,
     },
 
+    // Channel filter column: hidden, exists so the toolbar can render the
+    // channel filter. Filtering is applied server-side via channel_id.
+    {
+      id: 'channel_id',
+      accessorFn: (model) =>
+        (model.bound_channels ?? []).map((channel) => String(channel.id)),
+      header: t('Channel'),
+      cell: () => null,
+      enableHiding: false,
+      enableSorting: false,
+    },
+
     // Enable Groups column
     {
       accessorKey: 'enable_groups',
